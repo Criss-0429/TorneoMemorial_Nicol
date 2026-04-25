@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'motion/react';
+import { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, Info, X as CloseIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
