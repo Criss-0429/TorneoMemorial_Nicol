@@ -1,0 +1,6 @@
+{
+  "name": "Torneo Calcio App",
+  "description": "App gestionale per tornei di calcio con gestione squadre, calendari round-robin e classifiche live.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["auth", "database", "storage"]
+}

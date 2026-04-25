@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --color-tournament-primary: #3ecf8e;
+  --color-tournament-bg: #0A0A0A;
+  --color-tournament-card: rgba(24, 24, 27, 0.5); /* zinc-900/50 */
+  --color-tournament-border: #27272a; /* zinc-800 */
+  --color-tournament-text-muted: #a1a1aa; /* zinc-400 */
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-[color:var(--color-tournament-bg)] text-white font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-black tracking-tighter uppercase;
+  }
+}
+
+.card-bold {
+  @apply bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-3xl p-6;
+}
+
+.label-bold {
+  @apply text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase font-bold tracking-widest mb-1;
+}
+
+.btn-primary-bold {
+  @apply w-full bg-[color:var(--color-tournament-primary)] text-black font-black text-sm uppercase tracking-widest py-5 rounded-2xl transition-all hover:brightness-90 active:scale-[0.98];
+}
+
+.status-pulse {
+  @apply flex items-center font-mono text-xs text-[color:var(--color-tournament-primary)];
+}
+
+.status-dot {
+  @apply w-2 h-2 bg-[color:var(--color-tournament-primary)] rounded-full mr-2 animate-pulse;
+}
+
+.bottom-nav-glass {
+  @apply fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around bg-black/80 backdrop-blur-md border-t border-[color:var(--color-tournament-border)] px-2 sm:px-6;
+}
