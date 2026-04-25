@@ -2,46 +2,187 @@
 
 @theme {
   --color-tournament-primary: #3ecf8e;
-  --color-tournament-bg: #0A0A0A;
-  --color-tournament-card: rgba(24, 24, 27, 0.5); /* zinc-900/50 */
-  --color-tournament-border: #27272a; /* zinc-800 */
-  --color-tournament-text-muted: #a1a1aa; /* zinc-400 */
-  
+  --color-tournament-primary-hover: #2db87a;
+  --color-tournament-bg: #ffffff;
+  --color-tournament-card: #f9fafb;
+  --color-tournament-border: #e5e7eb;
+  --color-tournament-text: #111827;
+  --color-tournament-text-muted: #6b7280;
+  --color-tournament-input-bg: #ffffff;
+  --color-tournament-input-border: #d1d5db;
+  --color-tournament-nav-bg: rgba(255, 255, 255, 0.9);
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* Dark theme overrides */
+[data-theme="dark"] {
+  --color-tournament-bg: #0A0A0A;
+  --color-tournament-card: rgba(24, 24, 27, 0.6);
+  --color-tournament-border: #27272a;
+  --color-tournament-text: #ffffff;
+  --color-tournament-text-muted: #a1a1aa;
+  --color-tournament-input-bg: rgba(0, 0, 0, 0.5);
+  --color-tournament-input-border: #3f3f46;
+  --color-tournament-nav-bg: rgba(0, 0, 0, 0.85);
+}
+
 @layer base {
   body {
-    @apply bg-[color:var(--color-tournament-bg)] text-white font-sans antialiased;
+    @apply font-sans antialiased;
+    background-color: var(--color-tournament-bg);
+    color: var(--color-tournament-text);
     -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-black tracking-tighter uppercase;
+    color: var(--color-tournament-text);
+  }
+
+  * {
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
   }
 }
 
 .card-bold {
   @apply bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-3xl p-6;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card-bold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .card-bold:hover {
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.4);
 }
 
 .label-bold {
-  @apply text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase font-bold tracking-widest mb-1;
+  @apply text-[10px] uppercase font-bold tracking-widest mb-1;
+  color: var(--color-tournament-text-muted);
 }
 
 .btn-primary-bold {
-  @apply w-full bg-[color:var(--color-tournament-primary)] text-black font-black text-sm uppercase tracking-widest py-5 rounded-2xl transition-all hover:brightness-90 active:scale-[0.98];
+  @apply w-full font-black text-sm uppercase tracking-widest py-5 rounded-2xl transition-all active:scale-[0.98];
+  background-color: var(--color-tournament-primary);
+  color: #000;
+}
+
+.btn-primary-bold:hover {
+  background-color: var(--color-tournament-primary-hover);
+}
+
+.btn-secondary {
+  @apply w-full font-bold text-sm uppercase tracking-widest py-4 rounded-xl transition-all active:scale-[0.98];
+  background-color: var(--color-tournament-card);
+  color: var(--color-tournament-text);
+  border: 1px solid var(--color-tournament-border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-tournament-primary);
+}
+
+.btn-ghost {
+  @apply w-full font-bold text-sm uppercase tracking-widest py-3 rounded-xl transition-all hover:bg-[color:var(--color-tournament-card)] active:scale-[0.98];
+  color: var(--color-tournament-text-muted);
+}
+
+.btn-danger {
+  @apply w-full font-bold uppercase tracking-widest py-4 rounded-xl transition-all active:scale-[0.98];
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+}
+
+.input-field {
+  @apply w-full rounded-xl p-3 font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-1;
+  background-color: var(--color-tournament-input-bg);
+  border: 1px solid var(--color-tournament-input-border);
+  color: var(--color-tournament-text);
+}
+
+.input-field::placeholder {
+  color: var(--color-tournament-text-muted);
+  opacity: 0.6;
+}
+
+.input-field:focus {
+  border-color: var(--color-tournament-primary);
+  --tw-ring-color: var(--color-tournament-primary);
 }
 
 .status-pulse {
-  @apply flex items-center font-mono text-xs text-[color:var(--color-tournament-primary)];
+  @apply flex items-center font-mono text-xs;
+  color: var(--color-tournament-primary);
 }
 
 .status-dot {
-  @apply w-2 h-2 bg-[color:var(--color-tournament-primary)] rounded-full mr-2 animate-pulse;
+  @apply w-2 h-2 rounded-full mr-2 animate-pulse;
+  background-color: var(--color-tournament-primary);
 }
 
 .bottom-nav-glass {
-  @apply fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around bg-black/80 backdrop-blur-md border-t border-[color:var(--color-tournament-border)] px-2 sm:px-6;
+  @apply fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around backdrop-blur-md px-2 sm:px-6;
+  height: 72px;
+  background-color: var(--color-tournament-nav-bg);
+  border-top: 1px solid var(--color-tournament-border);
+}
+
+/* Skeleton Loading Animation */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.skeleton {
+  @apply rounded-lg;
+  background: linear-gradient(
+    90deg,
+    var(--color-tournament-border) 0%,
+    var(--color-tournament-text-muted) 50%,
+    var(--color-tournament-border) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  opacity: 0.3;
+}
+
+/* Toast Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: slideIn 0.3s ease forwards;
+}
+
+.toast-exit {
+  animation: slideOut 0.3s ease forwards;
 }

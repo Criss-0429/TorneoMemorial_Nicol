@@ -1,5 +1,6 @@
 
 export type Role = 'ospite' | 'ospite_autenticato' | 'capitano' | 'admin';
+export type Theme = 'light' | 'dark';
 
 export interface Squadra {
   id: string;
