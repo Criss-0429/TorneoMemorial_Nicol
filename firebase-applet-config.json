@@ -1,10 +1,9 @@
 {
-  "projectId": "gen-lang-client-0272805247",
-  "appId": "1:500970817989:web:d36663716afbb29cdfe3ac",
-  "apiKey": "AIzaSyBSjhv2C62oQ8t9c_SDWRKsbMoL4RnWnsg",
-  "authDomain": "gen-lang-client-0272805247.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-c9b86c10-cad8-4e3c-b7e3-23fc00ad2d6f",
-  "storageBucket": "gen-lang-client-0272805247.firebasestorage.app",
-  "messagingSenderId": "500970817989",
-  "measurementId": ""
+  "projectId": "torneomemorial-61cbe",
+  "appId": "1:305833515483:web:8c4efefe179108e4daeffe",
+  "apiKey": "AIzaSyCzDLZDxwnm9eT1Lk_spP5JQeRyMuMO-7k",
+  "authDomain": "torneomemorial-61cbe.firebaseapp.com",
+  "storageBucket": "torneomemorial-61cbe.firebasestorage.app",
+  "messagingSenderId": "305833515483",
+  "measurementId": "G-ZGG7QQ0SQL"
 }
