@@ -9,6 +9,7 @@ export interface Squadra {
   colore_maglia: string;
   colore_secondario: string;
   creato_at: string;
+  giorni_indisponibili?: string[]; // Date in formato YYYY-MM-DD in cui la squadra non può giocare
 }
 
 export interface Giocatore {
@@ -26,8 +27,8 @@ export interface Partita {
   trasferta_id: string;
   data: string;
   orario: string;
-  girone: number;
-  fase: 'girone' | 'spareggio' | 'semifinale' | 'finale';
+  girone?: number;
+  fase: 'girone' | 'spareggio' | 'semifinale' | 'finale' | 'quarti';
   gol_casa?: number;
   gol_trasferta?: number;
   completata: boolean;
@@ -40,6 +41,8 @@ export interface ConfigTorneo {
   andata_ritorno: boolean;
   riposo_minimo_giorni: number;
   fase_attuale: 'setup' | 'gironi' | 'playoff' | 'concluso';
+  giorni_torneo?: string[]; // Date valide per le partite YYYY-MM-DD
+  orari_torneo?: string[]; // Orari validi per le partite HH:MM
 }
 
 export interface Capitano {

@@ -56,9 +56,15 @@ export default function App() {
         setState(prev => ({ ...prev, ...cachedState, loading: false }));
       }
 
+      const pseudoUserStr = localStorage.getItem('torneo_pseudo_user');
+      let pUser = null;
+      if (pseudoUserStr) pUser = JSON.parse(pseudoUserStr);
+
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
           await handleAuthChange({ email: user.email, user_metadata: { avatar_url: user.photoURL } }, cachedState?.capitani || []);
+        } else if (pUser) {
+          await handleAuthChange(pUser, cachedState?.capitani || []);
         } else {
           setState(prev => ({ ...prev, loading: false }));
         }
@@ -89,7 +95,7 @@ export default function App() {
            if (data.length > 0) currentCapitani = data;
         } catch (e) {}
         
-        const isCapitano = currentCapitani.find(c => c.email === user.email);
+        const isCapitano = currentCapitani.find(c => c.email.toLowerCase() === user.email.toLowerCase());
         if (isCapitano) ruolo = 'capitano';
       }
     }
@@ -107,31 +113,9 @@ export default function App() {
     setShowLoginModal(true);
   };
 
-  const simulateLogin = (type: 'admin' | 'capitano' | 'user') => {
-    setShowLoginModal(false);
-    let email = 'user@example.com';
-    let avatar = 'https://i.pravatar.cc/150?u=user';
-    
-    if (type === 'admin') {
-      email = ADMIN_EMAILS[0];
-      avatar = 'https://i.pravatar.cc/150?u=admin';
-    } else if (type === 'capitano') {
-      email = 'capitano@example.com';
-      avatar = 'https://i.pravatar.cc/150?u=capitano';
-      // Aggiungiamo un capitano mock se non esiste
-      if (!state.capitani.find(c => c.email === email)) {
-        const mockCapitano: Capitano = {
-          id: 'mock-cap', email, squadra_id: 'mock-squadra', autorizzato_da: 'admin', creato_at: new Date().toISOString()
-        };
-        setState(prev => ({...prev, capitani: [...prev.capitani, mockCapitano]}));
-      }
-    }
-    
-    handleAuthChange({ email, user_metadata: { avatar_url: avatar } });
-  };
-
   const logout = async () => {
     try { await signOut(auth); } catch (e) {}
+    localStorage.removeItem('torneo_pseudo_user');
     handleAuthChange(null);
     setActiveTab('dashboard');
   };
@@ -279,38 +263,60 @@ export default function App() {
             >
               ✕
             </button>
-            <h2 className="text-2xl font-black uppercase tracking-tighter text-white mb-6">Simula Accesso</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-white mb-6">Accesso</h2>
             
-            <div className="space-y-3">
-              <button 
-                onClick={() => simulateLogin('admin')}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-colors border border-zinc-700 flex justify-between px-4 items-center"
-              >
-                <span>Accesso Admin</span>
-                <Settings size={16} className="text-[color:var(--color-tournament-primary)]"/>
-              </button>
+            <div className="space-y-6">
               
-              <button 
-                onClick={() => simulateLogin('capitano')}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-colors border border-zinc-700 flex justify-between px-4 items-center"
-              >
-                <span>Accesso Capitano</span>
-                <UserIcon size={16} className="text-[color:var(--color-tournament-primary)]"/>
-              </button>
+              <div>
+                <h3 className="label-bold mb-3">Login Capitani</h3>
+                <div className="flex flex-col gap-2">
+                  <input 
+                    type="text" 
+                    id="capitanoNome"
+                    placeholder="Nome e Cognome Capitano" 
+                    className="w-full bg-black/50 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-[color:var(--color-tournament-primary)] placeholder-zinc-600 text-sm"
+                  />
+                  <button 
+                    onClick={() => {
+                      const input = document.getElementById('capitanoNome') as HTMLInputElement;
+                      if (input && input.value.trim()) {
+                        const nomeCognome = input.value.trim();
+                        const found = state.capitani.find(c => c.email.toLowerCase() === nomeCognome.toLowerCase());
+                        if (found) {
+                          const pUser = { email: found.email, user_metadata: { avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(found.email)}&background=random` } };
+                          localStorage.setItem('torneo_pseudo_user', JSON.stringify(pUser));
+                          setShowLoginModal(false);
+                          handleAuthChange(pUser);
+                        } else {
+                          alert(`Capitano "${nomeCognome}" non trovato. Contatta l'amministratore per farti registrare.`);
+                        }
+                      }
+                    }}
+                    className="w-full bg-[color:var(--color-tournament-primary)] text-black font-black py-3 rounded-xl transition-colors uppercase tracking-widest text-xs hover:brightness-110"
+                  >
+                    Entra come Capitano
+                  </button>
+                </div>
+              </div>
 
-              <button 
-                 onClick={async () => {
-                  setShowLoginModal(false);
-                  try {
-                    await signInWithPopup(auth, new GoogleAuthProvider());
-                  } catch (error: any) {
-                    alert("OAuth error: " + error.message);
-                  }
-                 }}
-                className="w-full bg-[color:var(--color-tournament-primary)] text-black font-black py-3 rounded-xl transition-colors mt-4"
-              >
-                Vero Login Google (Test)
-              </button>
+              <div className="border-t border-zinc-800 pt-6">
+                <h3 className="label-bold mb-3">Login Staff / Admin</h3>
+                <button 
+                   onClick={async () => {
+                    setShowLoginModal(false);
+                    try {
+                      await signInWithPopup(auth, new GoogleAuthProvider());
+                    } catch (error: any) {
+                      alert("OAuth error: " + error.message);
+                    }
+                   }}
+                  className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3 rounded-xl transition-colors flex justify-center items-center gap-2"
+                >
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 mx-2" />
+                  Accedi con Google
+                </button>
+              </div>
+
             </div>
           </div>
         </div>
@@ -369,7 +375,7 @@ function PublicDashboardView({ state, login }: { state: IAppState, login: () => 
               <p className="text-xs text-[color:var(--color-tournament-primary)] mb-6 font-mono font-bold">» Admin & Capitani</p>
               <button onClick={login} className="btn-primary-bold flex items-center justify-center gap-3 py-4">
                 <LogIn size={18} />
-                <span className="mt-0.5">Accedi con Google</span>
+                <span className="mt-0.5">Accedi al Torneo</span>
               </button>
             </div>
           )}
@@ -510,7 +516,9 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
           <div key={p.id} className="card-bold py-4">
             <div className="flex justify-between items-center mb-3 text-[10px] uppercase font-bold text-zinc-500 tracking-widest">
               <span>{new Date(p.data).toLocaleDateString()} {p.orario}</span>
-              <span className="text-[color:var(--color-tournament-primary)]">{p.fase} - Girone {p.girone}</span>
+              <span className="text-[color:var(--color-tournament-primary)]">
+                {p.fase} {p.girone ? `- Girone ${p.girone}` : ''}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 text-right font-bold text-white text-lg truncate">{casa?.nome || p.casa_id}</div>
@@ -523,19 +531,30 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
               
               <div className="flex-1 text-left font-bold text-white text-lg truncate">{trasferta?.nome || p.trasferta_id}</div>
             </div>
-            {state.ruolo === 'admin' && !p.completata && (
-              <div className="mt-4 border-t border-zinc-800 pt-4 text-center">
+            {state.ruolo === 'admin' && (
+              <div className="mt-4 border-t border-zinc-800 pt-4 text-center flex justify-center gap-2">
                  <button onClick={() => {
-                   const ris = prompt("Inserisci risultato (es. 2-1)");
+                   const ris = prompt(`Inserisci risultato ${p.completata ? 'AGGIORNATO ' : ''}(es. 2-1)`);
                    if (ris && ris.includes('-')) {
                      const [gC, gT] = ris.split('-');
                      const updatedPartite = [...state.partite];
                      updatedPartite[idx] = { ...p, gol_casa: parseInt(gC), gol_trasferta: parseInt(gT), completata: true };
                      updateState({ partite: updatedPartite });
                    }
-                 }} className="mx-auto block text-xs bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold py-1 px-3 rounded-full transition-colors">
-                   INSERISCI RISULTATO
+                 }} className="block text-xs bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold py-1 px-3 rounded-full transition-colors">
+                   {p.completata ? 'MODIFICA RISULTATO' : 'INSERISCI RISULTATO'}
                  </button>
+                 {p.completata && (
+                   <button onClick={() => {
+                     if (confirm("Vuoi annullare questo risultato?")) {
+                       const updatedPartite = [...state.partite];
+                       updatedPartite[idx] = { ...p, gol_casa: undefined, gol_trasferta: undefined, completata: false };
+                       updateState({ partite: updatedPartite });
+                     }
+                   }} className="block text-xs bg-red-900/20 text-red-500 hover:bg-red-500 hover:text-white font-bold py-1 px-3 rounded-full transition-colors">
+                     ANNULLA
+                   </button>
+                 )}
               </div>
             )}
           </div>
@@ -610,38 +629,134 @@ function ClassificaView({ state }: { state: IAppState }) {
 }
 
 function AdminView({ state, updateState }: { state: IAppState, updateState: (s: Partial<IAppState>) => void }) { 
-  const [nuovaSquadra, setNuovaSquadra] = useState({ nome: '', girone: 1, colore: '#ffffff' });
+  const [nuovaSquadra, setNuovaSquadra] = useState({ nome: '', girone: 1, colore: '#ffffff', capitano: '' });
 
   const aggiungiSquadra = () => {
     if (!nuovaSquadra.nome) return;
+    const sId = `sq_${Date.now()}`;
     const s: Squadra = {
-      id: `sq_${Date.now()}`,
+      id: sId,
       nome: nuovaSquadra.nome,
       girone: nuovaSquadra.girone,
       colore_maglia: nuovaSquadra.colore,
       colore_secondario: '#000',
-      creato_at: new Date().toISOString()
+      creato_at: new Date().toISOString(),
+      giorni_indisponibili: []
     };
-    updateState({ squadre: [...state.squadre, s] });
-    setNuovaSquadra({ nome: '', girone: 1, colore: '#ffffff' });
+    
+    let updatedCapitani = state.capitani;
+    if (nuovaSquadra.capitano.trim()) {
+       updatedCapitani = [...state.capitani, {
+         id: `cap_${Date.now()}`,
+         email: nuovaSquadra.capitano.trim(), // Usiamo il campo email per conservare Nome e Cognome
+         squadra_id: sId,
+         autorizzato_da: 'admin',
+         creato_at: new Date().toISOString()
+       }];
+    }
+
+    updateState({ squadre: [...state.squadre, s], capitani: updatedCapitani });
+    setNuovaSquadra({ nome: '', girone: 1, colore: '#ffffff', capitano: '' });
   };
+
+  const [nuovaDataTorneo, setNuovaDataTorneo] = useState('');
+  const [nuovoOrarioTorneo, setNuovoOrarioTorneo] = useState('20:00');
+
+  const aggiungiDataTorneo = () => {
+    if (!nuovaDataTorneo) return;
+    const dateAt = state.config.giorni_torneo || [];
+    if (!dateAt.includes(nuovaDataTorneo)) {
+      updateState({ config: { ...state.config, giorni_torneo: [...dateAt, nuovaDataTorneo].sort() } });
+    }
+    setNuovaDataTorneo('');
+  };
+
+  const aggiungiOrarioTorneo = () => {
+    if (!nuovoOrarioTorneo) return;
+    const orariAt = state.config.orari_torneo || [];
+    if (!orariAt.includes(nuovoOrarioTorneo)) {
+      updateState({ config: { ...state.config, orari_torneo: [...orariAt, nuovoOrarioTorneo].sort() } });
+    }
+    setNuovoOrarioTorneo('20:00');
+  };
+
+  const rimuoviDataTorneo = (d: string) => {
+    updateState({ config: { ...state.config, giorni_torneo: (state.config.giorni_torneo || []).filter(x => x !== d) } });
+  }
+  const rimuoviOrarioTorneo = (o: string) => {
+    updateState({ config: { ...state.config, orari_torneo: (state.config.orari_torneo || []).filter(x => x !== o) } });
+  }
 
   const generaCalendarioMock = () => {
     if (state.squadre.length < 2) return alert("Aggiungi almeno 2 squadre");
+    const giorni = state.config.giorni_torneo || [];
+    const orari = state.config.orari_torneo || [];
+    if (giorni.length === 0 || orari.length === 0) {
+      return alert("Configura almeno 1 data e 1 orario validi per il torneo prima di generare il calendario.");
+    }
+
     const arr: Partita[] = [];
+    let matchId = 0;
+    let slotGiornoIdx = 0;
+    let slotOrarioIdx = 0;
+
+    const findNextAvailableSlot = (sq1: Squadra, sq2: Squadra): { data: string, orario: string } | null => {
+      let tentativi = 0;
+      let curGiornoIdx = slotGiornoIdx;
+      let curOrarioIdx = slotOrarioIdx;
+
+      while (tentativi < 100) { // Safety break
+        if (curGiornoIdx >= giorni.length) {
+          return null; // Finiti i giorni disponibili configurati
+        }
+
+        const dataPotenziale = giorni[curGiornoIdx];
+        const sq1Indisp = sq1.giorni_indisponibili || [];
+        const sq2Indisp = sq2.giorni_indisponibili || [];
+
+        // Check if both teams are available this day
+        if (!sq1Indisp.includes(dataPotenziale) && !sq2Indisp.includes(dataPotenziale)) {
+           // We found a valid day. Move global counters.
+           const tData = dataPotenziale;
+           const tOrario = orari[curOrarioIdx];
+           
+           curOrarioIdx++;
+           if (curOrarioIdx >= orari.length) {
+              curOrarioIdx = 0;
+              curGiornoIdx++;
+           }
+
+           slotGiornoIdx = curGiornoIdx;
+           slotOrarioIdx = curOrarioIdx;
+           return { data: tData, orario: tOrario };
+        }
+
+        // Se non va bene questo giorno, passiamo al successivo
+        curOrarioIdx = 0;
+        curGiornoIdx++;
+        tentativi++;
+      }
+      return null;
+    };
+
     const sqG1 = state.squadre.filter(s => s.girone === 1);
     const sqG2 = state.squadre.filter(s => s.girone === 2);
     
-    // Semplice generazione finta per far vedere l'UI (tutti contro tutti una volta nel girone)
     const generaPerGirone = (squadre: Squadra[], numG: number) => {
       for(let i=0; i<squadre.length; i++){
         for(let j=i+1; j<squadre.length; j++){
+          const matchSlot = findNextAvailableSlot(squadre[i], squadre[j]);
+          if (!matchSlot) {
+            console.warn(`Impossibile trovare uno slot (giorni esauriti) per ${squadre[i].nome} vs ${squadre[j].nome}`);
+            continue;
+          }
+          
           arr.push({
-            id: `p_${Date.now()}_${i}_${j}`,
+            id: `p_${Date.now()}_${++matchId}`,
             casa_id: squadre[i].id,
             trasferta_id: squadre[j].id,
-            data: new Date().toISOString(),
-            orario: "20:00",
+            data: matchSlot.data,
+            orario: matchSlot.orario,
             girone: numG,
             fase: 'girone',
             completata: false
@@ -649,10 +764,69 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
         }
       }
     };
+
     generaPerGirone(sqG1, 1);
     generaPerGirone(sqG2, 2);
     
     updateState({ partite: arr });
+  };
+
+  const generaPlayoffMock = () => {
+    // Raccoglie la classifica per prendere le prime due di ogni girone
+    const classifiche = [1, 2].map(girone => {
+      const squadreGirone = state.squadre.filter(s => s.girone === girone);
+      const stats = squadreGirone.map(s => {
+        let punti = 0, gf = 0, gs = 0;
+        state.partite.filter(p => p.completata && p.girone === girone && (p.casa_id === s.id || p.trasferta_id === s.id)).forEach(p => {
+          if (p.casa_id === s.id) {
+            gf += p.gol_casa!; gs += p.gol_trasferta!;
+            if (p.gol_casa! > p.gol_trasferta!) punti += 3;
+            else if (p.gol_casa === p.gol_trasferta) punti += 1;
+          } else {
+            gf += p.gol_trasferta!; gs += p.gol_casa!;
+            if (p.gol_trasferta! > p.gol_casa!) punti += 3;
+            else if (p.gol_casa === p.gol_trasferta) punti += 1;
+          }
+        });
+        return { ...s, punti, dr: gf - gs };
+      }).sort((a, b) => b.punti - a.punti || b.dr - a.dr);
+      return stats;
+    });
+
+    const primeG1 = classifiche[0].slice(0, 2);
+    const primeG2 = classifiche[1].slice(0, 2);
+
+    if (primeG1.length < 2 || primeG2.length < 2) {
+      return alert("Servono almeno 2 squadre per girone per generare le semifinali.");
+    }
+
+    const nuovePartite: Partita[] = [
+      {
+        id: `p_semi_1_${Date.now()}`,
+        casa_id: primeG1[0].id,
+        trasferta_id: primeG2[1].id,
+        data: new Date().toISOString(),
+        orario: "20:00",
+        girone: undefined,
+        fase: 'semifinale',
+        completata: false
+      },
+      {
+        id: `p_semi_2_${Date.now()}`,
+        casa_id: primeG2[0].id,
+        trasferta_id: primeG1[1].id,
+        data: new Date().toISOString(),
+        orario: "21:00",
+        girone: undefined,
+        fase: 'semifinale',
+        completata: false
+      }
+    ];
+
+    updateState({ 
+      partite: [...state.partite, ...nuovePartite],
+      config: { ...state.config, fase_attuale: 'playoff' }
+    });
   };
 
   return (
@@ -660,14 +834,21 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
       <h1 className="text-3xl font-black uppercase text-white border-b border-[color:var(--color-tournament-border)] pb-2">Admin Setup</h1>
       
       <div className="card-bold space-y-4">
-        <h2 className="label-bold">Aggiungi Squadra</h2>
+        <h2 className="label-bold">Aggiungi Squadra e Capitano</h2>
         <div className="flex flex-col gap-4">
           <input 
             type="text" 
             placeholder="Nome Squadra" 
             value={nuovaSquadra.nome}
             onChange={e => setNuovaSquadra({...nuovaSquadra, nome: e.target.value})}
-            className="w-full bg-black/50 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+            className="w-full bg-black/50 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-[color:var(--color-tournament-primary)] placeholder-zinc-600"
+          />
+          <input 
+            type="text" 
+            placeholder="Nome e Cognome Capitano (opzionale)" 
+            value={nuovaSquadra.capitano}
+            onChange={e => setNuovaSquadra({...nuovaSquadra, capitano: e.target.value})}
+            className="w-full bg-black/50 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-[color:var(--color-tournament-primary)] placeholder-zinc-600 text-sm"
           />
           <div className="flex gap-4">
             <div className="flex-1 flex flex-col gap-1">
@@ -698,11 +879,101 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
       </div>
 
       <div className="card-bold space-y-4">
-        <h2 className="label-bold">Azione Calendario</h2>
-        <p className="text-xs text-zinc-400 mb-4">Genera le partite in base alle squadre attualmente iscritte.</p>
-        <button onClick={generaCalendarioMock} className="w-full bg-zinc-800 text-white font-bold uppercase tracking-widest py-3 rounded-xl border border-zinc-700 hover:bg-zinc-700 transition">
-          Genera Calendario Base
-        </button>
+        <h2 className="label-bold">Configurazione Giorni e Orari Torneo</h2>
+        <p className="text-xs text-zinc-400">Specifica in quali giorni e a che ore si possono disputare le partite.</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+           <div className="space-y-2">
+             <div className="flex gap-2">
+               <input type="date" value={nuovaDataTorneo} onChange={e => setNuovaDataTorneo(e.target.value)} className="w-full bg-black/50 border border-zinc-800 rounded-xl p-2 text-white focus:outline-none" />
+               <button onClick={aggiungiDataTorneo} className="bg-zinc-800 text-white font-bold px-4 rounded-xl hover:bg-zinc-700">+</button>
+             </div>
+             <div className="flex flex-wrap gap-2 pt-2">
+               {state.config.giorni_torneo?.map(d => (
+                 <span key={d} className="bg-zinc-800 text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                   {new Date(d).toLocaleDateString()}
+                   <button onClick={() => rimuoviDataTorneo(d)} className="text-zinc-500 hover:text-red-400">✕</button>
+                 </span>
+               ))}
+             </div>
+           </div>
+
+           <div className="space-y-2">
+             <div className="flex gap-2">
+               <input type="time" value={nuovoOrarioTorneo} onChange={e => setNuovoOrarioTorneo(e.target.value)} className="w-full bg-black/50 border border-zinc-800 rounded-xl p-2 text-white focus:outline-none" />
+               <button onClick={aggiungiOrarioTorneo} className="bg-zinc-800 text-white font-bold px-4 rounded-xl hover:bg-zinc-700">+</button>
+             </div>
+             <div className="flex flex-wrap gap-2 pt-2">
+               {state.config.orari_torneo?.map(o => (
+                 <span key={o} className="bg-zinc-800 text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                   {o}
+                   <button onClick={() => rimuoviOrarioTorneo(o)} className="text-zinc-500 hover:text-red-400">✕</button>
+                 </span>
+               ))}
+             </div>
+           </div>
+        </div>
+      </div>
+
+      <div className="card-bold space-y-4">
+        <h2 className="label-bold">Gestione Squadre e Indisponibilità</h2>
+        {state.squadre.length === 0 ? (
+          <p className="text-xs text-zinc-500 italic">Nessuna squadra iscritta.</p>
+        ) : (
+          <div className="space-y-4">
+            {state.squadre.map(s => (
+              <div key={s.id} className="p-3 border border-zinc-800 rounded-xl bg-black/30">
+                 <div className="flex justify-between items-center mb-2">
+                   <div className="flex items-center gap-2">
+                     <div className="w-4 h-4 rounded-full" style={{backgroundColor: s.colore_maglia}}></div>
+                     <span className="font-bold text-white text-sm">{s.nome}</span>
+                     <span className="text-[10px] text-zinc-500 uppercase">Gir {s.girone}</span>
+                   </div>
+                 </div>
+                 {/* Elenco indisponibilità */}
+                 {s.giorni_indisponibili && s.giorni_indisponibili.length > 0 ? (
+                   <div className="flex flex-wrap gap-2 mt-2">
+                     {s.giorni_indisponibili.map(d => (
+                       <span key={d} className="bg-[color:var(--color-tournament-primary)]/10 border border-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                         {new Date(d).toLocaleDateString()}
+                         <button onClick={() => {
+                           const updatedSquadre = state.squadre.map(sq => sq.id === s.id ? { ...sq, giorni_indisponibili: sq.giorni_indisponibili!.filter(od => od !== d) } : sq);
+                           updateState({ squadre: updatedSquadre });
+                         }} className="hover:text-white transition w-4 h-4 flex items-center justify-center">✕</button>
+                       </span>
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="text-[10px] text-zinc-600 mt-1">Nessuna indisponibilità segnalata</div>
+                 )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card-bold space-y-4">
+        <h2 className="label-bold">Gestione Fasi / Calendario</h2>
+        
+        {state.config.fase_attuale !== 'playoff' && (
+          <div className="p-4 border border-zinc-800 rounded-xl bg-black/50">
+            <h3 className="text-white font-bold mb-2">Fase a Gironi</h3>
+            <p className="text-xs text-zinc-400 mb-4">Genera le partite del girone tenendo conto (nel sistema completo) dei giorni indisponibili delle squadre.</p>
+            <button onClick={generaCalendarioMock} className="w-full bg-zinc-800 text-white font-bold uppercase tracking-widest py-3 rounded-xl border border-zinc-700 hover:bg-zinc-700 transition">
+              Genera Calendario Gironi
+            </button>
+          </div>
+        )}
+
+        {state.config.fase_attuale === 'setup' || state.config.fase_attuale === 'gironi' ? (
+          <div className="p-4 border border-zinc-800 rounded-xl bg-black/50 mt-4">
+            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Playoff</h3>
+            <p className="text-xs text-zinc-400 mb-4">Chiude la fase a gironi e genera le semifinali con le prime 2 dei gironi.</p>
+            <button onClick={generaPlayoffMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
+              Genera Semifinali
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="card-bold space-y-4 border-red-900/30 bg-red-950/10">
@@ -723,6 +994,7 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
 function MiaSquadraView({ state, updateState }: { state: IAppState, updateState: (s: Partial<IAppState>) => void }) { 
   const miaSquadraRef = state.capitani.find(c => c.email === state.utente?.email);
   const miaSquadra = state.squadre.find(s => s.id === miaSquadraRef?.squadra_id);
+  const [nuovaData, setNuovaData] = useState('');
 
   if (!miaSquadra) return (
     <div className="card-bold text-center space-y-4 py-12">
@@ -731,11 +1003,58 @@ function MiaSquadraView({ state, updateState }: { state: IAppState, updateState:
     </div>
   );
 
+  const aggiungiData = () => {
+    if (!nuovaData) return;
+    const dateAttuali = miaSquadra.giorni_indisponibili || [];
+    if (!dateAttuali.includes(nuovaData)) {
+      const updatedSquadre = state.squadre.map(s => 
+        s.id === miaSquadra.id ? { ...s, giorni_indisponibili: [...dateAttuali, nuovaData] } : s
+      );
+      updateState({ squadre: updatedSquadre });
+    }
+    setNuovaData('');
+  };
+
+  const rimuoviData = (dataDaRimuovere: string) => {
+    const updatedSquadre = state.squadre.map(s => 
+      s.id === miaSquadra.id ? { ...s, giorni_indisponibili: (s.giorni_indisponibili || []).filter(d => d !== dataDaRimuovere) } : s
+    );
+    updateState({ squadre: updatedSquadre });
+  };
+
   return (
     <div className="space-y-6">
       <div className="card-bold text-center border-[color:var(--color-tournament-primary)]/50">
         <h1 className="text-3xl font-black uppercase tracking-tighter text-white">{miaSquadra.nome}</h1>
         <p className="text-[10px] text-[color:var(--color-tournament-primary)] font-mono mt-2">DASHBOARD CAPITANO</p>
+      </div>
+
+      <div className="card-bold space-y-4">
+         <h2 className="label-bold">Giorni Indisponibili</h2>
+         <p className="text-xs text-zinc-400 mb-4">Segnala le date in cui la tua squadra NON può giocare. Queste verranno evitate durante la generazione del calendario.</p>
+         
+         <div className="flex gap-2 mb-4">
+           <input 
+             type="date" 
+             value={nuovaData}
+             onChange={e => setNuovaData(e.target.value)}
+             className="flex-1 bg-black/50 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+           />
+           <button onClick={aggiungiData} className="bg-zinc-800 text-white font-bold px-4 rounded-xl hover:bg-zinc-700 transition">+</button>
+         </div>
+
+         {miaSquadra.giorni_indisponibili && miaSquadra.giorni_indisponibili.length > 0 ? (
+           <div className="flex flex-wrap gap-2">
+             {miaSquadra.giorni_indisponibili.map(data => (
+               <div key={data} className="bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] border border-[color:var(--color-tournament-primary)]/30 px-3 py-1.5 rounded-lg text-sm flex items-center gap-2">
+                 {new Date(data).toLocaleDateString()}
+                 <button onClick={() => rimuoviData(data)} className="hover:text-white transition">✕</button>
+               </div>
+             ))}
+           </div>
+         ) : (
+           <p className="text-xs text-zinc-500 italic">Nessuna data segnalata.</p>
+         )}
       </div>
 
       <div className="relative w-full aspect-[2/3] bg-gradient-to-b from-green-800 to-green-950 rounded-3xl border-4 border-white/10 overflow-hidden mt-6">
