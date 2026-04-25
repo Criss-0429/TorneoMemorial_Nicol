@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, Info, X as CloseIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -39,7 +39,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   );
 }
 
-function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+function ToastItem({ toast, onDismiss }: { key?: React.Key; toast: Toast; onDismiss: (id: string) => void }) {
   const Icon = icons[toast.type];
 
   useEffect(() => {
