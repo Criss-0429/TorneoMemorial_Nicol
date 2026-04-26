@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { auth, db } from './lib/firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, getDocs } from 'firebase/firestore';
@@ -235,7 +235,7 @@ export default function App() {
             {activeTab === 'squadre' && <SquadreView state={state} />}
             {activeTab === 'calendario' && <CalendarioView state={state} updateState={updateState} />}
             {activeTab === 'classifica' && <ClassificaView state={state} />}
-            {activeTab === 'admin' && <AdminView state={state} updateState={updateState} />}
+            {activeTab === 'admin' && <AdminView state={state} updateState={updateState} setActiveTab={setActiveTab} />}
             {activeTab === 'mia_squadra' && <MiaSquadraView state={state} updateState={updateState} />}
           </motion.div>
         </AnimatePresence>
@@ -534,6 +534,10 @@ function SquadreView({ state }: { state: IAppState }) {
 }
 
 function CalendarioView({ state, updateState }: { state: IAppState, updateState: (s: Partial<IAppState>) => void }) { 
+  const [risultatoEditing, setRisultatoEditing] = useState<{p: Partita, idx: number} | null>(null);
+  const [gCasa, setGCasa] = useState('');
+  const [gTrasferta, setGTrasferta] = useState('');
+
   if (state.partite.length === 0) return <div className="card-bold text-center text-[color:var(--color-tournament-text-muted)]">Il calendario non è ancora stato generato.</div>;
   
   const sortedPartite = [...state.partite].sort((a, b) => {
@@ -621,13 +625,9 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
             {state.ruolo === 'admin' && (
               <div className="mt-4 border-t border-[color:var(--color-tournament-border)] pt-4 text-center flex justify-center gap-2">
                  <button onClick={() => {
-                   const ris = prompt(`Inserisci risultato ${p.completata ? 'AGGIORNATO ' : ''}(es. 2-1)`);
-                   if (ris && ris.includes('-')) {
-                     const [gC, gT] = ris.split('-');
-                     const updatedPartite = [...state.partite];
-                     updatedPartite[idx] = { ...p, gol_casa: parseInt(gC), gol_trasferta: parseInt(gT), completata: true };
-                     updateState({ partite: updatedPartite });
-                   }
+                   setRisultatoEditing({ p, idx });
+                   setGCasa(p.gol_casa !== undefined ? p.gol_casa.toString() : '');
+                   setGTrasferta(p.gol_trasferta !== undefined ? p.gol_trasferta.toString() : '');
                  }} className="block text-xs bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold py-1 px-3 rounded-full transition-colors">
                    {p.completata ? 'MODIFICA RISULTATO' : 'INSERISCI RISULTATO'}
                  </button>
@@ -648,8 +648,74 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
           </React.Fragment>
         );
       })}
+      {risultatoEditing && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#111] border border-[color:var(--color-tournament-border)] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-xl font-black text-center text-[color:var(--color-tournament-text)] mb-6 uppercase tracking-widest">
+              Inserisci Risultato
+            </h3>
+            
+            <div className="flex items-center justify-between gap-4 mb-8">
+              <div className="flex-1 text-center">
+                <div className="text-sm font-bold text-[color:var(--color-tournament-text-muted)] truncate mb-2">
+                  {state.squadre.find(s => s.id === risultatoEditing.p.casa_id)?.nome}
+                </div>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={gCasa} 
+                  onChange={e => setGCasa(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-center text-3xl font-black text-[color:var(--color-tournament-text)] focus:border-[color:var(--color-tournament-primary)] focus:outline-none transition-all"
+                />
+              </div>
+              
+              <div className="text-2xl font-black text-[color:var(--color-tournament-text-muted)]">:</div>
+              
+              <div className="flex-1 text-center">
+                <div className="text-sm font-bold text-[color:var(--color-tournament-text-muted)] truncate mb-2">
+                  {state.squadre.find(s => s.id === risultatoEditing.p.trasferta_id)?.nome}
+                </div>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={gTrasferta} 
+                  onChange={e => setGTrasferta(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-center text-3xl font-black text-[color:var(--color-tournament-text)] focus:border-[color:var(--color-tournament-primary)] focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setRisultatoEditing(null)}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-[color:var(--color-tournament-text)] bg-white/5 hover:bg-white/10 transition-all uppercase tracking-wider text-xs"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={() => {
+                  if (gCasa && gTrasferta) {
+                    const updatedPartite = [...state.partite];
+                    updatedPartite[risultatoEditing.idx] = { 
+                      ...risultatoEditing.p, 
+                      gol_casa: parseInt(gCasa), 
+                      gol_trasferta: parseInt(gTrasferta), 
+                      completata: true 
+                    };
+                    updateState({ partite: updatedPartite });
+                    setRisultatoEditing(null);
+                  }
+                }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-black bg-[color:var(--color-tournament-primary)] hover:scale-105 transition-all uppercase tracking-wider text-xs shadow-[0_0_20px_rgba(var(--color-tournament-primary-rgb),0.3)]"
+              >
+                Salva
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  ); 
+  );
 }
 
 function ClassificaView({ state }: { state: IAppState }) { 
@@ -716,7 +782,7 @@ function ClassificaView({ state }: { state: IAppState }) {
   ); 
 }
 
-function AdminView({ state, updateState }: { state: IAppState, updateState: (s: Partial<IAppState>) => void }) { 
+function AdminView({ state, updateState, setActiveTab }: { state: IAppState, updateState: (s: Partial<IAppState>) => void, setActiveTab: (t:string)=>void }) { 
   const [nuovaSquadra, setNuovaSquadra] = useState({ nome: '', girone: 1, colore: '#ffffff', capitano: '' });
 
   const aggiungiSquadra = () => {
@@ -1154,34 +1220,45 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
         {state.config.fase_attuale !== 'playoff' && (
           <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)]">
             <h3 className="text-[color:var(--color-tournament-text)] font-bold mb-2">Fase a Gironi</h3>
-            <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera le partite del girone tenendo conto (nel sistema completo) dei giorni indisponibili delle squadre.</p>
-            
-            <div className="mb-4 p-3 bg-black/40 rounded-lg border border-[color:var(--color-tournament-border)]">
-              <h4 className="text-xs font-bold text-[color:var(--color-tournament-primary)] mb-2 uppercase">Partita di Apertura (Opzionale)</h4>
-              <div className="flex flex-col md:flex-row items-center gap-2">
-                <select 
-                  value={state.config.partita_apertura_casa || ""}
-                  onChange={e => updateState({ config: { ...state.config, partita_apertura_casa: e.target.value } })}
-                  className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-md p-2 text-xs text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
-                >
-                  <option value="">Squadra in Casa</option>
-                  {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome} (Gir {s.girone})</option>)}
-                </select>
-                <span className="text-[10px] font-bold text-[color:var(--color-tournament-text-muted)]">VS</span>
-                <select 
-                  value={state.config.partita_apertura_trasferta || ""}
-                  onChange={e => updateState({ config: { ...state.config, partita_apertura_trasferta: e.target.value } })}
-                  className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-md p-2 text-xs text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
-                >
-                  <option value="">Squadra in Trasferta</option>
-                  {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome} (Gir {s.girone})</option>)}
-                </select>
-              </div>
-            </div>
+            {state.partite.length === 0 ? (
+              <>
+                <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera le partite del girone tenendo conto delle regole e delle indisponibilità.</p>
+                
+                <div className="mb-4 p-3 bg-black/40 rounded-lg border border-[color:var(--color-tournament-border)]">
+                  <h4 className="text-xs font-bold text-[color:var(--color-tournament-primary)] mb-2 uppercase">Partita di Apertura (Opzionale)</h4>
+                  <div className="flex flex-col md:flex-row items-center gap-2">
+                    <select 
+                      value={state.config.partita_apertura_casa || ""}
+                      onChange={e => updateState({ config: { ...state.config, partita_apertura_casa: e.target.value } })}
+                      className="w-full bg-zinc-900 border border-white/10 rounded-lg p-2 text-xs text-[color:var(--color-tournament-text)] appearance-none focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+                    >
+                      <option value="">Squadra in Casa</option>
+                      {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome} (Gir {s.girone})</option>)}
+                    </select>
+                    <span className="text-[10px] font-bold text-[color:var(--color-tournament-text-muted)]">VS</span>
+                    <select 
+                      value={state.config.partita_apertura_trasferta || ""}
+                      onChange={e => updateState({ config: { ...state.config, partita_apertura_trasferta: e.target.value } })}
+                      className="w-full bg-zinc-900 border border-white/10 rounded-lg p-2 text-xs text-[color:var(--color-tournament-text)] appearance-none focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+                    >
+                      <option value="">Squadra in Trasferta</option>
+                      {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome} (Gir {s.girone})</option>)}
+                    </select>
+                  </div>
+                </div>
 
-            <button onClick={generaCalendarioMock} className="w-full bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold uppercase tracking-widest py-3 rounded-xl border border-[color:var(--color-tournament-border)] hover:bg-zinc-700 transition">
-              Genera Calendario Gironi
-            </button>
+                <button onClick={generaCalendarioMock} className="w-full bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold uppercase tracking-widest py-3 rounded-xl border border-[color:var(--color-tournament-border)] hover:bg-zinc-700 transition">
+                  Genera Calendario Gironi
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Il calendario è già stato generato. Modifica manualmente le singole partite dalla pagina del calendario.</p>
+                <button onClick={() => { setActiveTab('calendario'); window.scrollTo(0,0); }} className="w-full bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] font-bold uppercase tracking-widest py-3 rounded-xl border border-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black transition shadow-[0_0_15px_rgba(var(--color-tournament-primary-rgb),0.2)]">
+                  Modifica Calendario
+                </button>
+              </>
+            )}
           </div>
         )}
 

@@ -29,7 +29,7 @@ export interface Partita {
   data: string;
   orario: string;
   girone?: number;
-  fase: 'girone' | 'spareggio' | 'semifinale' | 'finale' | 'quarti';
+  fase: 'andata' | 'ritorno' | 'girone' | 'spareggio' | 'semifinale' | 'finale' | 'quarti';
   gol_casa?: number;
   gol_trasferta?: number;
   completata: boolean;
