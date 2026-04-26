@@ -899,8 +899,8 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
       }
     }
 
-    const andataMatches: {s1: Squadra, s2: Squadra, girone: number, fase: string}[] = [];
-    const ritornoMatches: {s1: Squadra, s2: Squadra, girone: number, fase: string}[] = [];
+    const andataMatches: {s1: Squadra, s2: Squadra, girone: number, fase: Partita['fase']}[] = [];
+    const ritornoMatches: {s1: Squadra, s2: Squadra, girone: number, fase: Partita['fase']}[] = [];
     
     const sqG1 = state.squadre.filter(s => s.girone === 1);
     const sqG2 = state.squadre.filter(s => s.girone === 2);
@@ -1254,9 +1254,18 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
             ) : (
               <>
                 <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Il calendario è già stato generato. Modifica manualmente le singole partite dalla pagina del calendario.</p>
-                <button onClick={() => { setActiveTab('calendario'); window.scrollTo(0,0); }} className="w-full bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] font-bold uppercase tracking-widest py-3 rounded-xl border border-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black transition shadow-[0_0_15px_rgba(var(--color-tournament-primary-rgb),0.2)]">
-                  Modifica Calendario
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => { setActiveTab('calendario'); window.scrollTo(0,0); }} className="flex-1 text-xs sm:text-sm bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] font-bold uppercase tracking-widest py-3 rounded-xl border border-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black transition shadow-[0_0_15px_rgba(var(--color-tournament-primary-rgb),0.2)]">
+                    Modifica Calendario
+                  </button>
+                  <button onClick={() => { 
+                    if(confirm("Vuoi davvero eliminare tutto il calendario generato? Questa operazione è irreversibile.")) {
+                      updateState({ partite: [] });
+                    }
+                  }} className="text-xs sm:text-sm bg-red-900/20 text-red-500 font-bold uppercase tracking-widest py-3 px-4 rounded-xl border border-red-500/30 hover:bg-red-500 hover:text-[color:var(--color-tournament-text)] transition" title="Elimina Calendario">
+                    Elimina
+                  </button>
+                </div>
               </>
             )}
           </div>
