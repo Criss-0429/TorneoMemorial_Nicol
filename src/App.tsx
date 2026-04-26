@@ -74,6 +74,18 @@ export default function App() {
       const unsubState = onSnapshot(doc(db, 'torneo', 'main_state'), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
+          
+          // Salvaguardia: se Firebase è vuoto ma abbiamo dati locali, pubblica i dati locali
+          if ((!data.squadre || data.squadre.length === 0) && cachedState && cachedState.squadre?.length > 0) {
+            setDoc(doc(db, 'torneo', 'main_state'), {
+              squadre: cachedState.squadre,
+              partite: cachedState.partite,
+              capitani: cachedState.capitani,
+              config: cachedState.config
+            }).catch(console.error);
+            return;
+          }
+
           setState(prev => {
             const newState = {
               ...prev,
