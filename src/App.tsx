@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { auth, db } from './lib/firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { AppState, Role, AppState as IAppState, Capitano, Squadra, Partita } from './types';
 import {
   LayoutDashboard,
@@ -57,10 +57,10 @@ export default function App() {
 
   // --- LOGICA AUTH & Inizializzazione ---
   useEffect(() => {
-    const init = async () => {
+    const init = () => {
       // Caricamento offline cache
       const cache = localStorage.getItem('torneo_cache');
-      let cachedState = null;
+      let cachedState: any = null;
       if (cache) {
         cachedState = JSON.parse(cache);
         setState(prev => ({ ...prev, ...cachedState, loading: false }));
@@ -70,42 +70,69 @@ export default function App() {
       let pUser = null;
       if (pseudoUserStr) pUser = JSON.parse(pseudoUserStr);
 
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Listen to Firestore for real-time updates
+      const unsubState = onSnapshot(doc(db, 'torneo', 'main_state'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setState(prev => {
+            const newState = {
+              ...prev,
+              squadre: data.squadre || [],
+              partite: data.partite || [],
+              capitani: data.capitani || [],
+              config: data.config || prev.config,
+              loading: false
+            };
+            localStorage.setItem('torneo_cache', JSON.stringify({
+              squadre: newState.squadre,
+              partite: newState.partite,
+              capitani: newState.capitani,
+              config: newState.config
+            }));
+            
+            // Aggiorna il ruolo nel caso un capitano sia stato appena aggiunto
+            if (prev.utente) {
+               handleAuthChange(prev.utente, newState.capitani);
+            }
+            return newState;
+          });
+        } else if (cachedState) {
+          // Initialize DB with cached state if DB is empty
+          setDoc(doc(db, 'torneo', 'main_state'), {
+            squadre: cachedState.squadre || [],
+            partite: cachedState.partite || [],
+            capitani: cachedState.capitani || [],
+            config: cachedState.config
+          }).catch(console.error);
+        }
+      });
+
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
-          await handleAuthChange({ email: user.email, user_metadata: { avatar_url: user.photoURL } }, cachedState?.capitani || []);
+          handleAuthChange({ email: user.email, user_metadata: { avatar_url: user.photoURL } }, cachedState?.capitani || []);
         } else if (pUser) {
-          await handleAuthChange(pUser, cachedState?.capitani || []);
+          handleAuthChange(pUser, cachedState?.capitani || []);
         } else {
           setState(prev => ({ ...prev, loading: false }));
         }
       });
-      return unsubscribe;
+      return () => {
+        unsubscribe();
+        unsubState();
+      };
     };
-    const unsubscribePromise = init();
-    return () => {
-      unsubscribePromise.then(unsub => unsub?.());
-    };
+    return init();
   }, []);
 
-  const handleAuthChange = async (user: any | null, capitaniList: Capitano[] = state.capitani) => {
+  const handleAuthChange = (user: any | null, capitaniList: Capitano[] = state.capitani) => {
     let ruolo: Role = 'ospite';
-    let currentCapitani = capitaniList;
 
     if (user) {
       ruolo = 'ospite_autenticato';
       if (ADMIN_EMAILS.some(e => e.toLowerCase() === user.email.toLowerCase())) {
         ruolo = 'admin';
       } else {
-        try {
-           const querySnapshot = await getDocs(collection(db, 'capitani'));
-           const data: any = [];
-           querySnapshot.forEach((doc) => {
-             data.push({ id: doc.id, ...doc.data() });
-           });
-           if (data.length > 0) currentCapitani = data;
-        } catch (e) {}
-        
-        const isCapitano = currentCapitani.find(c => c.email.toLowerCase() === user.email.toLowerCase());
+        const isCapitano = capitaniList.find(c => c.email.toLowerCase() === user.email.toLowerCase());
         if (isCapitano) ruolo = 'capitano';
       }
     }
@@ -114,7 +141,6 @@ export default function App() {
       ...prev, 
       utente: user, 
       ruolo, 
-      capitani: currentCapitani,
       loading: false 
     }));
   };
@@ -140,6 +166,14 @@ export default function App() {
         capitani: updated.capitani,
         config: updated.config
       }));
+      
+      setDoc(doc(db, 'torneo', 'main_state'), {
+        squadre: updated.squadre,
+        partite: updated.partite,
+        capitani: updated.capitani,
+        config: updated.config
+      }).catch(e => console.error("Errore salvataggio DB:", e));
+
       return updated;
     });
   };
@@ -174,7 +208,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col bg-[color:var(--color-tournament-bg)] pb-24">
       {/* Header Fisso */}
-      <header className="sticky top-0 z-50 flex h-16 sm:h-20 items-center justify-between border-b border-[color:var(--color-tournament-border)] bg-[color:var(--color-tournament-nav-bg)] backdrop-blur-md px-4 sm:px-6">
+      <header className="sticky top-0 z-50 flex h-16 sm:h-20 items-center justify-between border-b border-[color:var(--color-tournament-border)] bg-[color:var(--color-tournament-nav-bg)] backdrop-blur-md px-4 sm:px-6 print:hidden">
         <div className="flex items-center gap-3 sm:gap-4">
           <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[color:var(--color-tournament-primary)] text-black shadow-lg shadow-[color:var(--color-tournament-primary)]/20">
             <Trophy className="h-5 w-5 sm:h-6 sm:w-6" weight="fill" />
@@ -242,7 +276,7 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation Bar */}
-      <nav className="bottom-nav-glass">
+      <nav className="bottom-nav-glass print:hidden">
         {/* ... TabButtons renderizzati originariamente, preservati più in basso se possibile ... */}
         <TabButton 
           active={activeTab === 'dashboard'} 
@@ -550,7 +584,12 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)] mb-6 border-b border-[color:var(--color-tournament-border)] pb-2">Calendario Partite</h2>
+      <div className="flex justify-between items-center mb-6 border-b border-[color:var(--color-tournament-border)] pb-2">
+        <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)]">Calendario Partite</h2>
+        <button onClick={() => window.print()} className="bg-[color:var(--color-tournament-primary)] text-black font-bold text-xs uppercase tracking-widest py-2 px-4 rounded-xl hover:brightness-90 transition print:hidden shadow-lg shadow-[color:var(--color-tournament-primary)]/20 cursor-pointer">
+          Stampa PDF
+        </button>
+      </div>
       
       {sortedPartite.map((p) => {
         const casa = state.squadre.find(s => s.id === p.casa_id);
@@ -629,7 +668,7 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
               </div>
             </div>
             {state.ruolo === 'admin' && (
-              <div className="mt-4 border-t border-[color:var(--color-tournament-border)] pt-4 text-center flex justify-center gap-2">
+              <div className="mt-4 border-t border-[color:var(--color-tournament-border)] pt-4 text-center flex justify-center gap-2 print:hidden">
                  <button onClick={() => {
                    setRisultatoEditing({ p, idx });
                    setGCasa(p.gol_casa !== undefined ? p.gol_casa.toString() : '');

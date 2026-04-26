@@ -186,3 +186,21 @@
 .toast-exit {
   animation: slideOut 0.3s ease forwards;
 }
+
+/* Print styles for better PDF output */
+@media print {
+  :root, [data-theme="dark"] {
+    --color-tournament-bg: #ffffff !important;
+    --color-tournament-card: #ffffff !important;
+    --color-tournament-border: #e5e7eb !important;
+    --color-tournament-text: #000000 !important;
+    --color-tournament-text-muted: #666666 !important;
+  }
+  body {
+    background-color: white !important;
+  }
+  .card-bold {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+}
