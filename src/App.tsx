@@ -591,36 +591,42 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
                 {p.fase} {p.girone ? `- Girone ${p.girone}` : ''}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              {state.ruolo === 'admin' ? (
-                 <select value={p.casa_id} onChange={e => {
-                    const updatedPartite = [...state.partite];
-                    updatedPartite[idx] = { ...p, casa_id: e.target.value };
-                    updateState({ partite: updatedPartite });
-                 }} className="bg-transparent text-right font-bold text-[color:var(--color-tournament-text)] text-lg truncate w-24 sm:w-32 focus:outline-none border-b border-transparent hover:border-zinc-700">
-                   {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                 </select>
-              ) : (
-                <div className="flex-1 text-right font-bold text-[color:var(--color-tournament-text)] text-lg truncate">{casa?.nome || p.casa_id}</div>
-              )}
-              
-              <div className="flex items-center justify-center gap-2 bg-[color:var(--color-tournament-card)] px-4 py-2 rounded-xl border border-[color:var(--color-tournament-border)] shrink-0">
-                <span className="text-xl font-black">{p.completata ? p.gol_casa : '-'}</span>
-                <span className="text-[color:var(--color-tournament-text-muted)]">:</span>
-                <span className="text-xl font-black">{p.completata ? p.gol_trasferta : '-'}</span>
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+              <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
+                {state.ruolo === 'admin' ? (
+                   <select value={p.casa_id} onChange={e => {
+                      const updatedPartite = [...state.partite];
+                      updatedPartite[idx] = { ...p, casa_id: e.target.value };
+                      updateState({ partite: updatedPartite });
+                   }} className="bg-transparent text-right font-bold text-[color:var(--color-tournament-text)] text-sm sm:text-base focus:outline-none border-b border-transparent hover:border-zinc-700 max-w-full" style={{ textOverflow: 'unset' }}>
+                     {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                   </select>
+                ) : (
+                  <div className="text-right font-bold text-[color:var(--color-tournament-text)] text-sm sm:text-base break-words text-wrap">{casa?.nome || p.casa_id}</div>
+                )}
+                {casa && <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shrink-0 border border-[color:var(--color-tournament-border)]" style={{ backgroundColor: casa.colore_maglia }}></div>}
               </div>
               
-              {state.ruolo === 'admin' ? (
-                 <select value={p.trasferta_id} onChange={e => {
-                    const updatedPartite = [...state.partite];
-                    updatedPartite[idx] = { ...p, trasferta_id: e.target.value };
-                    updateState({ partite: updatedPartite });
-                 }} className="bg-transparent text-left font-bold text-[color:var(--color-tournament-text)] text-lg truncate w-24 sm:w-32 focus:outline-none border-b border-transparent hover:border-zinc-700">
-                   {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                 </select>
-              ) : (
-                <div className="flex-1 text-left font-bold text-[color:var(--color-tournament-text)] text-lg truncate">{trasferta?.nome || p.trasferta_id}</div>
-              )}
+              <div className="flex items-center justify-center gap-1 sm:gap-2 bg-[color:var(--color-tournament-card)] px-2 sm:px-4 py-2 rounded-xl border border-[color:var(--color-tournament-border)] shrink-0">
+                <span className="text-base sm:text-xl font-black">{p.completata ? p.gol_casa : '-'}</span>
+                <span className="text-[color:var(--color-tournament-text-muted)]">:</span>
+                <span className="text-base sm:text-xl font-black">{p.completata ? p.gol_trasferta : '-'}</span>
+              </div>
+              
+              <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
+                {trasferta && <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shrink-0 border border-[color:var(--color-tournament-border)]" style={{ backgroundColor: trasferta.colore_maglia }}></div>}
+                {state.ruolo === 'admin' ? (
+                   <select value={p.trasferta_id} onChange={e => {
+                      const updatedPartite = [...state.partite];
+                      updatedPartite[idx] = { ...p, trasferta_id: e.target.value };
+                      updateState({ partite: updatedPartite });
+                   }} className="bg-transparent text-left font-bold text-[color:var(--color-tournament-text)] text-sm sm:text-base focus:outline-none border-b border-transparent hover:border-zinc-700 max-w-full" style={{ textOverflow: 'unset' }}>
+                     {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                   </select>
+                ) : (
+                  <div className="text-left font-bold text-[color:var(--color-tournament-text)] text-sm sm:text-base break-words text-wrap">{trasferta?.nome || p.trasferta_id}</div>
+                )}
+              </div>
             </div>
             {state.ruolo === 'admin' && (
               <div className="mt-4 border-t border-[color:var(--color-tournament-border)] pt-4 text-center flex justify-center gap-2">
@@ -928,13 +934,16 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
 
     const matchesToSchedule = [...andataMatches];
 
-    for (const match of matchesToSchedule) {
-       const slot = availableSlots.find(s => {
-          if (s.usato) return false;
-          if (match.s1.giorni_indisponibili?.includes(s.data)) return false;
-          if (match.s2.giorni_indisponibili?.includes(s.data)) return false;
+    let remainingMatches = [...matchesToSchedule];
 
-          const dDate = new Date(s.data);
+    for (const slot of availableSlots) {
+       if (slot.usato) continue;
+
+       const matchIndex = remainingMatches.findIndex(match => {
+          if (match.s1.giorni_indisponibili?.includes(slot.data)) return false;
+          if (match.s2.giorni_indisponibili?.includes(slot.data)) return false;
+
+          const dDate = new Date(slot.data);
           const dPrima = new Date(dDate); dPrima.setDate(dDate.getDate() - 1);
           const dDopo = new Date(dDate); dDopo.setDate(dDate.getDate() + 1);
           const dPrimaStr = dPrima.toISOString().split('T')[0];
@@ -942,12 +951,13 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
 
           const canPlay = !arr.some(p => 
              (p.casa_id === match.s1.id || p.trasferta_id === match.s1.id || p.casa_id === match.s2.id || p.trasferta_id === match.s2.id) &&
-             (p.data === s.data || p.data === dPrimaStr || p.data === dDopoStr)
+             (p.data === slot.data || p.data === dPrimaStr || p.data === dDopoStr)
           );
           return canPlay;
        });
 
-       if (slot) {
+       if (matchIndex !== -1) {
+          const match = remainingMatches[matchIndex];
           slot.usato = true;
           arr.push({
              id: `p_${Date.now()}_${++matchId}`,
@@ -959,9 +969,14 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
              fase: match.fase,
              completata: false
           });
-       } else {
-          console.warn(`Impossibile trovare slot per ${match.s1.nome} vs ${match.s2.nome}`);
+          remainingMatches.splice(matchIndex, 1);
        }
+       
+       if (remainingMatches.length === 0) break;
+    }
+
+    if (remainingMatches.length > 0) {
+      alert(`Attenzione: Impossibile schedulare ${remainingMatches.length} partite con i giorni e gli orari attualmente configurati. Aggiungi più giorni o orari.`);
     }
     updateState({ 
       partite: arr,
