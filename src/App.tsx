@@ -692,15 +692,39 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
   };
 
   const [nuovaDataTorneo, setNuovaDataTorneo] = useState('');
+  const [dataFineRange, setDataFineRange] = useState('');
+  const [giorniSettimana, setGiorniSettimana] = useState<number[]>([1,2,3,4,5]);
   const [nuovoOrarioTorneo, setNuovoOrarioTorneo] = useState('20:00');
 
   const aggiungiDataTorneo = () => {
     if (!nuovaDataTorneo) return;
     const dateAt = state.config.giorni_torneo || [];
-    if (!dateAt.includes(nuovaDataTorneo)) {
-      updateState({ config: { ...state.config, giorni_torneo: [...dateAt, nuovaDataTorneo].sort() } });
+    
+    let dateDaAggiungere: string[] = [];
+    if (dataFineRange) {
+      let current = new Date(nuovaDataTorneo);
+      const end = new Date(dataFineRange);
+      while (current <= end) {
+        if (giorniSettimana.includes(current.getDay())) {
+          dateDaAggiungere.push(current.toISOString().split('T')[0]);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    } else {
+      dateDaAggiungere = [nuovaDataTorneo];
     }
+
+    const nuoveDate = dateDaAggiungere.filter(d => !dateAt.includes(d));
+    if (nuoveDate.length > 0) {
+      updateState({ config: { ...state.config, giorni_torneo: [...dateAt, ...nuoveDate].sort() } });
+    }
+    
     setNuovaDataTorneo('');
+    setDataFineRange('');
+  };
+
+  const toggleGiorno = (day: number) => {
+    setGiorniSettimana(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
   const aggiungiOrarioTorneo = () => {
@@ -915,29 +939,52 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
         <p className="text-xs text-[color:var(--color-tournament-text-muted)]">Specifica in quali giorni e a che ore si possono disputare le partite.</p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-           <div className="space-y-2">
-             <div className="flex gap-2">
-               <input type="date" value={nuovaDataTorneo} onChange={e => setNuovaDataTorneo(e.target.value)} className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-2 text-[color:var(--color-tournament-text)] focus:outline-none" />
-               <button onClick={aggiungiDataTorneo} className="bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold px-4 rounded-xl hover:bg-zinc-700">+</button>
+           <div className="space-y-3">
+             <div className="flex gap-2 items-center">
+               <input type="date" style={{ colorScheme: 'dark' }} value={nuovaDataTorneo} onChange={e => setNuovaDataTorneo(e.target.value)} className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-2 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]" />
+               <span className="text-xs text-[color:var(--color-tournament-text-muted)] font-bold">a</span>
+               <input type="date" style={{ colorScheme: 'dark' }} value={dataFineRange} onChange={e => setDataFineRange(e.target.value)} className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-2 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]" />
              </div>
+             
+             {dataFineRange && (
+               <div className="flex justify-between mt-2">
+                 {[1,2,3,4,5,6,0].map(day => {
+                   const labels = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+                   return (
+                     <button 
+                       key={day} 
+                       onClick={() => toggleGiorno(day)} 
+                       className={`w-8 h-8 rounded-full text-xs font-bold transition border border-[color:var(--color-tournament-border)] ${giorniSettimana.includes(day) ? 'bg-[color:var(--color-tournament-primary)] text-black' : 'bg-zinc-800 text-[color:var(--color-tournament-text-muted)] hover:bg-zinc-700'}`}
+                     >
+                       {labels[day].charAt(0)}
+                     </button>
+                   );
+                 })}
+               </div>
+             )}
+
+             <button onClick={aggiungiDataTorneo} className="w-full bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold px-4 py-2 mt-2 rounded-xl border border-[color:var(--color-tournament-border)] hover:bg-zinc-700 transition">
+               Aggiungi {dataFineRange ? 'Range' : 'Data'}
+             </button>
+
              <div className="flex flex-wrap gap-2 pt-2">
                {state.config.giorni_torneo?.map(d => (
-                 <span key={d} className="bg-zinc-800 text-xs px-2 py-1 rounded-md flex items-center gap-1">
-                   {new Date(d).toLocaleDateString()}
+                 <span key={d} className="bg-zinc-800 text-xs px-2 py-1 rounded-md flex items-center gap-1 border border-[color:var(--color-tournament-border)]">
+                   {new Date(d).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                    <button onClick={() => rimuoviDataTorneo(d)} className="text-[color:var(--color-tournament-text-muted)] hover:text-red-400">✕</button>
                  </span>
                ))}
              </div>
            </div>
 
-           <div className="space-y-2">
+           <div className="space-y-3">
              <div className="flex gap-2">
-               <input type="time" value={nuovoOrarioTorneo} onChange={e => setNuovoOrarioTorneo(e.target.value)} className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-2 text-[color:var(--color-tournament-text)] focus:outline-none" />
-               <button onClick={aggiungiOrarioTorneo} className="bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold px-4 rounded-xl hover:bg-zinc-700">+</button>
+               <input type="time" style={{ colorScheme: 'dark' }} value={nuovoOrarioTorneo} onChange={e => setNuovoOrarioTorneo(e.target.value)} className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-2 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]" />
+               <button onClick={aggiungiOrarioTorneo} className="bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold px-4 rounded-xl border border-[color:var(--color-tournament-border)] hover:bg-zinc-700 transition">+</button>
              </div>
              <div className="flex flex-wrap gap-2 pt-2">
                {state.config.orari_torneo?.map(o => (
-                 <span key={o} className="bg-zinc-800 text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                 <span key={o} className="bg-zinc-800 text-xs px-2 py-1 rounded-md flex items-center gap-1 border border-[color:var(--color-tournament-border)]">
                    {o}
                    <button onClick={() => rimuoviOrarioTorneo(o)} className="text-[color:var(--color-tournament-text-muted)] hover:text-red-400">✕</button>
                  </span>
@@ -1027,6 +1074,8 @@ function MiaSquadraView({ state, updateState }: { state: IAppState, updateState:
   const miaSquadraRef = state.capitani.find(c => c.email === state.utente?.email);
   const miaSquadra = state.squadre.find(s => s.id === miaSquadraRef?.squadra_id);
   const [nuovaData, setNuovaData] = useState('');
+  const [dataFine, setDataFine] = useState('');
+  const [giorniSettimana, setGiorniSettimana] = useState<number[]>([1,2,3,4,5]);
 
   if (!miaSquadra) return (
     <div className="card-bold text-center space-y-4 py-12">
@@ -1038,13 +1087,35 @@ function MiaSquadraView({ state, updateState }: { state: IAppState, updateState:
   const aggiungiData = () => {
     if (!nuovaData) return;
     const dateAttuali = miaSquadra.giorni_indisponibili || [];
-    if (!dateAttuali.includes(nuovaData)) {
+    let dateDaAggiungere: string[] = [];
+    
+    if (dataFine) {
+      let current = new Date(nuovaData);
+      const end = new Date(dataFine);
+      while (current <= end) {
+        if (giorniSettimana.includes(current.getDay())) {
+          dateDaAggiungere.push(current.toISOString().split('T')[0]);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    } else {
+      dateDaAggiungere = [nuovaData];
+    }
+
+    const nuoveDate = dateDaAggiungere.filter(d => !dateAttuali.includes(d));
+    
+    if (nuoveDate.length > 0) {
       const updatedSquadre = state.squadre.map(s => 
-        s.id === miaSquadra.id ? { ...s, giorni_indisponibili: [...dateAttuali, nuovaData] } : s
+        s.id === miaSquadra.id ? { ...s, giorni_indisponibili: [...dateAttuali, ...nuoveDate].sort() } : s
       );
       updateState({ squadre: updatedSquadre });
     }
     setNuovaData('');
+    setDataFine('');
+  };
+
+  const toggleGiorno = (day: number) => {
+    setGiorniSettimana(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
   const rimuoviData = (dataDaRimuovere: string) => {
@@ -1065,22 +1136,51 @@ function MiaSquadraView({ state, updateState }: { state: IAppState, updateState:
          <h2 className="label-bold">Giorni Indisponibili</h2>
          <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Segnala le date in cui la tua squadra NON può giocare. Queste verranno evitate durante la generazione del calendario.</p>
          
-         <div className="flex gap-2 mb-4">
-           <input 
-             type="date" 
-             value={nuovaData}
-             onChange={e => setNuovaData(e.target.value)}
-             className="flex-1 bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
-           />
-           <button onClick={aggiungiData} className="bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold px-4 rounded-xl hover:bg-zinc-700 transition">+</button>
+         <div className="space-y-3 mb-4">
+             <div className="flex gap-2 items-center">
+               <input 
+                 type="date" style={{ colorScheme: 'dark' }}
+                 value={nuovaData}
+                 onChange={e => setNuovaData(e.target.value)}
+                 className="flex-1 bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+               />
+               <span className="text-xs text-[color:var(--color-tournament-text-muted)] font-bold">a</span>
+               <input 
+                 type="date" style={{ colorScheme: 'dark' }}
+                 value={dataFine}
+                 onChange={e => setDataFine(e.target.value)}
+                 className="flex-1 bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+               />
+             </div>
+             
+             {dataFine && (
+               <div className="flex justify-between mt-2 px-2">
+                 {[1,2,3,4,5,6,0].map(day => {
+                   const labels = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+                   return (
+                     <button 
+                       key={day} 
+                       onClick={() => toggleGiorno(day)} 
+                       className={`w-8 h-8 rounded-full text-xs font-bold transition border border-[color:var(--color-tournament-border)] ${giorniSettimana.includes(day) ? 'bg-[color:var(--color-tournament-primary)] text-black' : 'bg-[color:var(--color-tournament-card)] text-[color:var(--color-tournament-text-muted)] hover:bg-[color:var(--color-tournament-border)]'}`}
+                     >
+                       {labels[day].charAt(0)}
+                     </button>
+                   );
+                 })}
+               </div>
+             )}
+
+             <button onClick={aggiungiData} className="w-full bg-[color:var(--color-tournament-card)] text-[color:var(--color-tournament-text)] font-bold px-4 py-3 mt-2 rounded-xl border border-[color:var(--color-tournament-border)] hover:bg-[color:var(--color-tournament-border)] transition">
+               Aggiungi {dataFine ? 'Range' : 'Data'}
+             </button>
          </div>
 
          {miaSquadra.giorni_indisponibili && miaSquadra.giorni_indisponibili.length > 0 ? (
            <div className="flex flex-wrap gap-2">
              {miaSquadra.giorni_indisponibili.map(data => (
                <div key={data} className="bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] border border-[color:var(--color-tournament-primary)]/30 px-3 py-1.5 rounded-lg text-sm flex items-center gap-2">
-                 {new Date(data).toLocaleDateString()}
-                 <button onClick={() => rimuoviData(data)} className="hover:text-[color:var(--color-tournament-text)] transition">✕</button>
+                 {new Date(data).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                 <button onClick={() => rimuoviData(data)} className="hover:text-[color:var(--color-tournament-text)] transition font-bold">✕</button>
                </div>
              ))}
            </div>
