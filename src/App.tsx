@@ -93,7 +93,7 @@ export default function App() {
 
     if (user) {
       ruolo = 'ospite_autenticato';
-      if (ADMIN_EMAILS.includes(user.email)) {
+      if (ADMIN_EMAILS.some(e => e.toLowerCase() === user.email.toLowerCase())) {
         ruolo = 'admin';
       } else {
         try {
@@ -892,7 +892,7 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
           data: availableSlots[0].data,
           orario: availableSlots[0].orario,
           girone: c.girone,
-          fase: 'andata',
+          fase: 'fase a gironi',
           completata: false
         });
         availableSlots[0].usato = true;
@@ -900,25 +900,22 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
     }
 
     const andataMatches: {s1: Squadra, s2: Squadra, girone: number, fase: Partita['fase']}[] = [];
-    const ritornoMatches: {s1: Squadra, s2: Squadra, girone: number, fase: Partita['fase']}[] = [];
     
     const sqG1 = state.squadre.filter(s => s.girone === 1);
     const sqG2 = state.squadre.filter(s => s.girone === 2);
 
     const buildMatches = (squadre: Squadra[], numG: number) => {
       const a = [];
-      const r = [];
       for(let i=0; i<squadre.length; i++){
         for(let j=i+1; j<squadre.length; j++){
           if ((squadre[i].id === sqAperturaCasa && squadre[j].id === sqAperturaTrasferta) ||
               (squadre[i].id === sqAperturaTrasferta && squadre[j].id === sqAperturaCasa)) {
             continue;
           }
-          a.push({ s1: squadre[i], s2: squadre[j], girone: numG, fase: 'andata' });
-          r.push({ s1: squadre[j], s2: squadre[i], girone: numG, fase: 'ritorno' });
+          a.push({ s1: squadre[i], s2: squadre[j], girone: numG, fase: 'fase a gironi' });
         }
       }
-      return { andata: a, ritorno: r };
+      return { andata: a };
     };
     
     const g1 = buildMatches(sqG1, 1);
@@ -928,12 +925,8 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
         if(g1.andata[i]) andataMatches.push(g1.andata[i]);
         if(g2.andata[i]) andataMatches.push(g2.andata[i]);
     }
-    for(let i=0; i<Math.max(g1.ritorno.length, g2.ritorno.length); i++) {
-        if(g1.ritorno[i]) ritornoMatches.push(g1.ritorno[i]);
-        if(g2.ritorno[i]) ritornoMatches.push(g2.ritorno[i]);
-    }
 
-    const matchesToSchedule = [...andataMatches, ...ritornoMatches];
+    const matchesToSchedule = [...andataMatches];
 
     for (const match of matchesToSchedule) {
        const slot = availableSlots.find(s => {
@@ -970,8 +963,10 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
           console.warn(`Impossibile trovare slot per ${match.s1.nome} vs ${match.s2.nome}`);
        }
     }
-    
-    updateState({ partite: arr });
+    updateState({ 
+      partite: arr,
+      config: { ...state.config, fase_attuale: 'gironi' }
+    });
   };
 
   const generaPlayoffMock = () => {
@@ -1029,6 +1024,31 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
     updateState({ 
       partite: [...state.partite, ...nuovePartite],
       config: { ...state.config, fase_attuale: 'playoff' }
+    });
+  };
+
+  const generaFinaleMock = () => {
+    const semifinali = state.partite.filter(p => p.fase === 'semifinale');
+    if (semifinali.length !== 2) return alert("Devono esserci esattamente 2 semifinali.");
+    if (!semifinali.every(p => p.completata)) return alert("Completa prima i risultati di tutte le semifinali.");
+    
+    const vincitrice1 = semifinali[0].gol_casa! > semifinali[0].gol_trasferta! ? semifinali[0].casa_id : semifinali[0].trasferta_id;
+    const vincitrice2 = semifinali[1].gol_casa! > semifinali[1].gol_trasferta! ? semifinali[1].casa_id : semifinali[1].trasferta_id;
+
+    const nuovaFinale: Partita = {
+      id: `p_finale_${Date.now()}`,
+      casa_id: vincitrice1,
+      trasferta_id: vincitrice2,
+      data: new Date().toISOString(),
+      orario: "21:00",
+      girone: undefined,
+      fase: 'finale',
+      completata: false
+    };
+
+    updateState({ 
+      partite: [...state.partite, nuovaFinale],
+      config: { ...state.config, fase_attuale: 'concluso' }
     });
   };
 
@@ -1273,10 +1293,20 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
 
         {state.config.fase_attuale === 'setup' || state.config.fase_attuale === 'gironi' ? (
           <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)] mt-4">
-            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Playoff</h3>
+            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Playoff (Semifinali)</h3>
             <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Chiude la fase a gironi e genera le semifinali con le prime 2 dei gironi.</p>
             <button onClick={generaPlayoffMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
               Genera Semifinali
+            </button>
+          </div>
+        ) : null}
+
+        {state.config.fase_attuale === 'playoff' ? (
+          <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)] mt-4">
+            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Finale</h3>
+            <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera la finale con le vincitrici delle semifinali.</p>
+            <button onClick={generaFinaleMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
+              Genera Finale
             </button>
           </div>
         ) : null}
