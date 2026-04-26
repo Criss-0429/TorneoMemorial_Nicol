@@ -536,16 +536,36 @@ function SquadreView({ state }: { state: IAppState }) {
 function CalendarioView({ state, updateState }: { state: IAppState, updateState: (s: Partial<IAppState>) => void }) { 
   if (state.partite.length === 0) return <div className="card-bold text-center text-[color:var(--color-tournament-text-muted)]">Il calendario non è ancora stato generato.</div>;
   
+  const sortedPartite = [...state.partite].sort((a, b) => {
+    const dateA = new Date(`${a.data}T${a.orario}`);
+    const dateB = new Date(`${b.data}T${b.orario}`);
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  let currentFase = '';
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)] mb-6 border-b border-[color:var(--color-tournament-border)] pb-2">Calendario Partite</h2>
       
-      {state.partite.map((p, idx) => {
+      {sortedPartite.map((p) => {
         const casa = state.squadre.find(s => s.id === p.casa_id);
         const trasferta = state.squadre.find(s => s.id === p.trasferta_id);
+        const idx = state.partite.findIndex(sp => sp.id === p.id);
+        
+        const isNewFase = p.fase !== currentFase;
+        if (isNewFase) currentFase = p.fase;
         
         return (
-          <div key={p.id} className="card-bold py-4">
+          <React.Fragment key={p.id}>
+            {isNewFase && (
+               <div className="mt-8 mb-4">
+                 <h3 className="text-xl font-black text-[color:var(--color-tournament-primary)] uppercase tracking-widest bg-[color:var(--color-tournament-primary)]/10 px-4 py-2 rounded-lg border border-[color:var(--color-tournament-primary)]/30 inline-block">
+                   {p.fase}
+                 </h3>
+               </div>
+            )}
+            <div className="card-bold py-4">
             <div className="flex justify-between items-center mb-3 text-[10px] uppercase font-bold text-[color:var(--color-tournament-text-muted)] tracking-widest">
               {state.ruolo === 'admin' ? (
                  <div className="flex gap-2">
@@ -625,6 +645,7 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
               </div>
             )}
           </div>
+          </React.Fragment>
         );
       })}
     </div>
@@ -805,30 +826,48 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
           data: availableSlots[0].data,
           orario: availableSlots[0].orario,
           girone: c.girone,
-          fase: 'girone',
+          fase: 'andata',
           completata: false
         });
         availableSlots[0].usato = true;
       }
     }
 
-    const matchesToSchedule: {s1: Squadra, s2: Squadra, girone: number}[] = [];
+    const andataMatches: {s1: Squadra, s2: Squadra, girone: number, fase: string}[] = [];
+    const ritornoMatches: {s1: Squadra, s2: Squadra, girone: number, fase: string}[] = [];
+    
     const sqG1 = state.squadre.filter(s => s.girone === 1);
     const sqG2 = state.squadre.filter(s => s.girone === 2);
 
     const buildMatches = (squadre: Squadra[], numG: number) => {
+      const a = [];
+      const r = [];
       for(let i=0; i<squadre.length; i++){
         for(let j=i+1; j<squadre.length; j++){
           if ((squadre[i].id === sqAperturaCasa && squadre[j].id === sqAperturaTrasferta) ||
               (squadre[i].id === sqAperturaTrasferta && squadre[j].id === sqAperturaCasa)) {
             continue;
           }
-          matchesToSchedule.push({ s1: squadre[i], s2: squadre[j], girone: numG });
+          a.push({ s1: squadre[i], s2: squadre[j], girone: numG, fase: 'andata' });
+          r.push({ s1: squadre[j], s2: squadre[i], girone: numG, fase: 'ritorno' });
         }
       }
+      return { andata: a, ritorno: r };
     };
-    buildMatches(sqG1, 1);
-    buildMatches(sqG2, 2);
+    
+    const g1 = buildMatches(sqG1, 1);
+    const g2 = buildMatches(sqG2, 2);
+
+    for(let i=0; i<Math.max(g1.andata.length, g2.andata.length); i++) {
+        if(g1.andata[i]) andataMatches.push(g1.andata[i]);
+        if(g2.andata[i]) andataMatches.push(g2.andata[i]);
+    }
+    for(let i=0; i<Math.max(g1.ritorno.length, g2.ritorno.length); i++) {
+        if(g1.ritorno[i]) ritornoMatches.push(g1.ritorno[i]);
+        if(g2.ritorno[i]) ritornoMatches.push(g2.ritorno[i]);
+    }
+
+    const matchesToSchedule = [...andataMatches, ...ritornoMatches];
 
     for (const match of matchesToSchedule) {
        const slot = availableSlots.find(s => {
@@ -858,7 +897,7 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
              data: slot.data,
              orario: slot.orario,
              girone: match.girone,
-             fase: 'girone',
+             fase: match.fase,
              completata: false
           });
        } else {
