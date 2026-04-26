@@ -44,6 +44,8 @@ export interface ConfigTorneo {
   fase_attuale: 'setup' | 'gironi' | 'playoff' | 'concluso';
   giorni_torneo?: string[]; // Date valide per le partite YYYY-MM-DD
   orari_torneo?: string[]; // Orari validi per le partite HH:MM
+  partita_apertura_casa?: string;
+  partita_apertura_trasferta?: string;
 }
 
 export interface Capitano {

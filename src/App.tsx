@@ -547,21 +547,56 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
         return (
           <div key={p.id} className="card-bold py-4">
             <div className="flex justify-between items-center mb-3 text-[10px] uppercase font-bold text-[color:var(--color-tournament-text-muted)] tracking-widest">
-              <span>{new Date(p.data).toLocaleDateString()} {p.orario}</span>
+              {state.ruolo === 'admin' ? (
+                 <div className="flex gap-2">
+                   <input type="date" style={{colorScheme: 'dark'}} value={p.data} onChange={e => {
+                      const updatedPartite = [...state.partite];
+                      updatedPartite[idx] = { ...p, data: e.target.value };
+                      updateState({ partite: updatedPartite });
+                   }} className="bg-transparent border-b border-transparent focus:border-[color:var(--color-tournament-primary)] focus:outline-none" />
+                   <input type="time" style={{colorScheme: 'dark'}} value={p.orario} onChange={e => {
+                      const updatedPartite = [...state.partite];
+                      updatedPartite[idx] = { ...p, orario: e.target.value };
+                      updateState({ partite: updatedPartite });
+                   }} className="bg-transparent border-b border-transparent focus:border-[color:var(--color-tournament-primary)] focus:outline-none" />
+                 </div>
+              ) : (
+                <span>{new Date(p.data).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })} {p.orario}</span>
+              )}
               <span className="text-[color:var(--color-tournament-primary)]">
                 {p.fase} {p.girone ? `- Girone ${p.girone}` : ''}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 text-right font-bold text-[color:var(--color-tournament-text)] text-lg truncate">{casa?.nome || p.casa_id}</div>
+              {state.ruolo === 'admin' ? (
+                 <select value={p.casa_id} onChange={e => {
+                    const updatedPartite = [...state.partite];
+                    updatedPartite[idx] = { ...p, casa_id: e.target.value };
+                    updateState({ partite: updatedPartite });
+                 }} className="bg-transparent text-right font-bold text-[color:var(--color-tournament-text)] text-lg truncate w-24 sm:w-32 focus:outline-none border-b border-transparent hover:border-zinc-700">
+                   {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                 </select>
+              ) : (
+                <div className="flex-1 text-right font-bold text-[color:var(--color-tournament-text)] text-lg truncate">{casa?.nome || p.casa_id}</div>
+              )}
               
-              <div className="flex items-center justify-center gap-2 bg-[color:var(--color-tournament-card)] px-4 py-2 rounded-xl border border-[color:var(--color-tournament-border)]">
+              <div className="flex items-center justify-center gap-2 bg-[color:var(--color-tournament-card)] px-4 py-2 rounded-xl border border-[color:var(--color-tournament-border)] shrink-0">
                 <span className="text-xl font-black">{p.completata ? p.gol_casa : '-'}</span>
                 <span className="text-[color:var(--color-tournament-text-muted)]">:</span>
                 <span className="text-xl font-black">{p.completata ? p.gol_trasferta : '-'}</span>
               </div>
               
-              <div className="flex-1 text-left font-bold text-[color:var(--color-tournament-text)] text-lg truncate">{trasferta?.nome || p.trasferta_id}</div>
+              {state.ruolo === 'admin' ? (
+                 <select value={p.trasferta_id} onChange={e => {
+                    const updatedPartite = [...state.partite];
+                    updatedPartite[idx] = { ...p, trasferta_id: e.target.value };
+                    updateState({ partite: updatedPartite });
+                 }} className="bg-transparent text-left font-bold text-[color:var(--color-tournament-text)] text-lg truncate w-24 sm:w-32 focus:outline-none border-b border-transparent hover:border-zinc-700">
+                   {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                 </select>
+              ) : (
+                <div className="flex-1 text-left font-bold text-[color:var(--color-tournament-text)] text-lg truncate">{trasferta?.nome || p.trasferta_id}</div>
+              )}
             </div>
             {state.ruolo === 'admin' && (
               <div className="mt-4 border-t border-[color:var(--color-tournament-border)] pt-4 text-center flex justify-center gap-2">
@@ -753,76 +788,83 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
 
     const arr: Partita[] = [];
     let matchId = 0;
-    let slotGiornoIdx = 0;
-    let slotOrarioIdx = 0;
 
-    const findNextAvailableSlot = (sq1: Squadra, sq2: Squadra): { data: string, orario: string } | null => {
-      let tentativi = 0;
-      let curGiornoIdx = slotGiornoIdx;
-      let curOrarioIdx = slotOrarioIdx;
+    const sqAperturaCasa = state.config.partita_apertura_casa;
+    const sqAperturaTrasferta = state.config.partita_apertura_trasferta;
 
-      while (tentativi < 100) { // Safety break
-        if (curGiornoIdx >= giorni.length) {
-          return null; // Finiti i giorni disponibili configurati
-        }
+    const availableSlots = giorni.flatMap(d => orari.map(o => ({ data: d, orario: o, usato: false })));
 
-        const dataPotenziale = giorni[curGiornoIdx];
-        const sq1Indisp = sq1.giorni_indisponibili || [];
-        const sq2Indisp = sq2.giorni_indisponibili || [];
-
-        // Check if both teams are available this day
-        if (!sq1Indisp.includes(dataPotenziale) && !sq2Indisp.includes(dataPotenziale)) {
-           // We found a valid day. Move global counters.
-           const tData = dataPotenziale;
-           const tOrario = orari[curOrarioIdx];
-           
-           curOrarioIdx++;
-           if (curOrarioIdx >= orari.length) {
-              curOrarioIdx = 0;
-              curGiornoIdx++;
-           }
-
-           slotGiornoIdx = curGiornoIdx;
-           slotOrarioIdx = curOrarioIdx;
-           return { data: tData, orario: tOrario };
-        }
-
-        // Se non va bene questo giorno, passiamo al successivo
-        curOrarioIdx = 0;
-        curGiornoIdx++;
-        tentativi++;
+    if (sqAperturaCasa && sqAperturaTrasferta && availableSlots.length > 0) {
+      const c = state.squadre.find(s => s.id === sqAperturaCasa);
+      const t = state.squadre.find(s => s.id === sqAperturaTrasferta);
+      if (c && t) {
+        arr.push({
+          id: `p_${Date.now()}_apertura`,
+          casa_id: c.id,
+          trasferta_id: t.id,
+          data: availableSlots[0].data,
+          orario: availableSlots[0].orario,
+          girone: c.girone,
+          fase: 'girone',
+          completata: false
+        });
+        availableSlots[0].usato = true;
       }
-      return null;
-    };
+    }
 
+    const matchesToSchedule: {s1: Squadra, s2: Squadra, girone: number}[] = [];
     const sqG1 = state.squadre.filter(s => s.girone === 1);
     const sqG2 = state.squadre.filter(s => s.girone === 2);
-    
-    const generaPerGirone = (squadre: Squadra[], numG: number) => {
+
+    const buildMatches = (squadre: Squadra[], numG: number) => {
       for(let i=0; i<squadre.length; i++){
         for(let j=i+1; j<squadre.length; j++){
-          const matchSlot = findNextAvailableSlot(squadre[i], squadre[j]);
-          if (!matchSlot) {
-            console.warn(`Impossibile trovare uno slot (giorni esauriti) per ${squadre[i].nome} vs ${squadre[j].nome}`);
+          if ((squadre[i].id === sqAperturaCasa && squadre[j].id === sqAperturaTrasferta) ||
+              (squadre[i].id === sqAperturaTrasferta && squadre[j].id === sqAperturaCasa)) {
             continue;
           }
-          
-          arr.push({
-            id: `p_${Date.now()}_${++matchId}`,
-            casa_id: squadre[i].id,
-            trasferta_id: squadre[j].id,
-            data: matchSlot.data,
-            orario: matchSlot.orario,
-            girone: numG,
-            fase: 'girone',
-            completata: false
-          });
+          matchesToSchedule.push({ s1: squadre[i], s2: squadre[j], girone: numG });
         }
       }
     };
+    buildMatches(sqG1, 1);
+    buildMatches(sqG2, 2);
 
-    generaPerGirone(sqG1, 1);
-    generaPerGirone(sqG2, 2);
+    for (const match of matchesToSchedule) {
+       const slot = availableSlots.find(s => {
+          if (s.usato) return false;
+          if (match.s1.giorni_indisponibili?.includes(s.data)) return false;
+          if (match.s2.giorni_indisponibili?.includes(s.data)) return false;
+
+          const dDate = new Date(s.data);
+          const dPrima = new Date(dDate); dPrima.setDate(dDate.getDate() - 1);
+          const dDopo = new Date(dDate); dDopo.setDate(dDate.getDate() + 1);
+          const dPrimaStr = dPrima.toISOString().split('T')[0];
+          const dDopoStr = dDopo.toISOString().split('T')[0];
+
+          const canPlay = !arr.some(p => 
+             (p.casa_id === match.s1.id || p.trasferta_id === match.s1.id || p.casa_id === match.s2.id || p.trasferta_id === match.s2.id) &&
+             (p.data === s.data || p.data === dPrimaStr || p.data === dDopoStr)
+          );
+          return canPlay;
+       });
+
+       if (slot) {
+          slot.usato = true;
+          arr.push({
+             id: `p_${Date.now()}_${++matchId}`,
+             casa_id: match.s1.id,
+             trasferta_id: match.s2.id,
+             data: slot.data,
+             orario: slot.orario,
+             girone: match.girone,
+             fase: 'girone',
+             completata: false
+          });
+       } else {
+          console.warn(`Impossibile trovare slot per ${match.s1.nome} vs ${match.s2.nome}`);
+       }
+    }
     
     updateState({ partite: arr });
   };
@@ -1003,28 +1045,64 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
             {state.squadre.map(s => (
               <div key={s.id} className="p-3 border border-[color:var(--color-tournament-border)] rounded-xl bg-black/30">
                  <div className="flex justify-between items-center mb-2">
-                   <div className="flex items-center gap-2">
-                     <div className="w-4 h-4 rounded-full" style={{backgroundColor: s.colore_maglia}}></div>
-                     <span className="font-bold text-[color:var(--color-tournament-text)] text-sm">{s.nome}</span>
-                     <span className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase">Gir {s.girone}</span>
+                   <div className="flex items-center gap-2 flex-wrap">
+                     <input type="color" value={s.colore_maglia} onChange={(e) => updateState({ squadre: state.squadre.map(sq => sq.id === s.id ? { ...sq, colore_maglia: e.target.value } : sq) })} className="w-5 h-5 rounded-full border border-white/20 p-0 cursor-pointer bg-transparent" title="Cambia colore" />
+                     <input type="text" value={s.nome} onChange={(e) => updateState({ squadre: state.squadre.map(sq => sq.id === s.id ? { ...sq, nome: e.target.value } : sq) })} className="font-bold text-[color:var(--color-tournament-text)] text-sm bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-[color:var(--color-tournament-primary)] focus:outline-none w-32" title="Modifica nome" />
+                     <select 
+                       value={s.girone}
+                       onChange={(e) => {
+                         const updatedSquadre = state.squadre.map(sq => sq.id === s.id ? { ...sq, girone: parseInt(e.target.value) } : sq);
+                         updateState({ squadre: updatedSquadre });
+                       }}
+                       className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-md px-2 py-1 text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase font-bold focus:outline-none cursor-pointer ml-2"
+                     >
+                       <option value={1}>Girone 1</option>
+                       <option value={2}>Girone 2</option>
+                     </select>
                    </div>
+                   <button 
+                     onClick={() => {
+                       if(confirm(`Vuoi davvero eliminare la squadra ${s.nome}?`)) {
+                         updateState({ 
+                           squadre: state.squadre.filter(sq => sq.id !== s.id),
+                           partite: state.partite.filter(p => p.casa_id !== s.id && p.trasferta_id !== s.id)
+                         });
+                       }
+                     }}
+                     className="text-red-500/70 hover:text-red-400 text-xs font-bold transition px-2"
+                     title="Elimina squadra"
+                   >
+                     ✕
+                   </button>
                  </div>
                  {/* Elenco indisponibilità */}
-                 {s.giorni_indisponibili && s.giorni_indisponibili.length > 0 ? (
-                   <div className="flex flex-wrap gap-2 mt-2">
-                     {s.giorni_indisponibili.map(d => (
-                       <span key={d} className="bg-[color:var(--color-tournament-primary)]/10 border border-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] text-xs px-2 py-1 rounded-md flex items-center gap-1">
-                         {new Date(d).toLocaleDateString()}
-                         <button onClick={() => {
-                           const updatedSquadre = state.squadre.map(sq => sq.id === s.id ? { ...sq, giorni_indisponibili: sq.giorni_indisponibili!.filter(od => od !== d) } : sq);
+                 <div className="flex flex-wrap gap-2 mt-2 items-center">
+                   {s.giorni_indisponibili?.map(d => (
+                     <span key={d} className="bg-[color:var(--color-tournament-primary)]/10 border border-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                       {new Date(d).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                       <button onClick={() => {
+                         const updatedSquadre = state.squadre.map(sq => sq.id === s.id ? { ...sq, giorni_indisponibili: sq.giorni_indisponibili!.filter(od => od !== d) } : sq);
+                         updateState({ squadre: updatedSquadre });
+                       }} className="hover:text-[color:var(--color-tournament-text)] transition font-bold">✕</button>
+                     </span>
+                   ))}
+                   <input 
+                     type="date" 
+                     style={{ colorScheme: 'dark' }} 
+                     className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-md px-2 py-1 text-xs text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]" 
+                     onChange={(e) => {
+                       if (e.target.value) {
+                         const d = e.target.value;
+                         if (!s.giorni_indisponibili?.includes(d)) {
+                           const updatedSquadre = state.squadre.map(sq => sq.id === s.id ? { ...sq, giorni_indisponibili: [...(sq.giorni_indisponibili || []), d].sort() } : sq);
                            updateState({ squadre: updatedSquadre });
-                         }} className="hover:text-[color:var(--color-tournament-text)] transition w-4 h-4 flex items-center justify-center">✕</button>
-                       </span>
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="text-[10px] text-[color:var(--color-tournament-text-muted)] mt-1">Nessuna indisponibilità segnalata</div>
-                 )}
+                         }
+                         e.target.value = '';
+                       }
+                     }} 
+                     title="Aggiungi giorno di indisponibilità"
+                   />
+                 </div>
               </div>
             ))}
           </div>
@@ -1038,6 +1116,30 @@ function AdminView({ state, updateState }: { state: IAppState, updateState: (s: 
           <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)]">
             <h3 className="text-[color:var(--color-tournament-text)] font-bold mb-2">Fase a Gironi</h3>
             <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera le partite del girone tenendo conto (nel sistema completo) dei giorni indisponibili delle squadre.</p>
+            
+            <div className="mb-4 p-3 bg-black/40 rounded-lg border border-[color:var(--color-tournament-border)]">
+              <h4 className="text-xs font-bold text-[color:var(--color-tournament-primary)] mb-2 uppercase">Partita di Apertura (Opzionale)</h4>
+              <div className="flex flex-col md:flex-row items-center gap-2">
+                <select 
+                  value={state.config.partita_apertura_casa || ""}
+                  onChange={e => updateState({ config: { ...state.config, partita_apertura_casa: e.target.value } })}
+                  className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-md p-2 text-xs text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+                >
+                  <option value="">Squadra in Casa</option>
+                  {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome} (Gir {s.girone})</option>)}
+                </select>
+                <span className="text-[10px] font-bold text-[color:var(--color-tournament-text-muted)]">VS</span>
+                <select 
+                  value={state.config.partita_apertura_trasferta || ""}
+                  onChange={e => updateState({ config: { ...state.config, partita_apertura_trasferta: e.target.value } })}
+                  className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-md p-2 text-xs text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+                >
+                  <option value="">Squadra in Trasferta</option>
+                  {state.squadre.map(s => <option key={s.id} value={s.id}>{s.nome} (Gir {s.girone})</option>)}
+                </select>
+              </div>
+            </div>
+
             <button onClick={generaCalendarioMock} className="w-full bg-zinc-800 text-[color:var(--color-tournament-text)] font-bold uppercase tracking-widest py-3 rounded-xl border border-[color:var(--color-tournament-border)] hover:bg-zinc-700 transition">
               Genera Calendario Gironi
             </button>
