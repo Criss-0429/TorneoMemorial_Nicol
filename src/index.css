@@ -204,3 +204,6 @@
     box-shadow: none !important;
   }
 }
+@media print {
+  header, nav, .print\:hidden { display: none !important; }
+}

@@ -1378,6 +1378,19 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
         ) : null}
       </div>
 
+      <div className="card-bold space-y-4 border-orange-900/30 bg-orange-950/10 mb-8">
+        <h2 className="label-bold text-orange-500">Sincronizzazione Cloud</h2>
+        <p className="text-xs text-[color:var(--color-tournament-text-muted)]">Usa questo pulsante per forzare il caricamento di tutti i dati attuali (squadre, partite, ecc.) su Firebase. Utile per "pubblicare" online il lavoro già fatto in locale se il sito per gli altri non è ancora aggiornato.</p>
+        <button onClick={() => {
+          if (confirm("Vuoi forzare la pubblicazione di tutti i dati correnti online?")) {
+            updateState({});
+            alert("Pubblicazione completata! Ora tutti vedranno i tuoi dati aggiornati.");
+          }
+        }} className="w-full bg-orange-600/20 text-orange-500 font-bold uppercase tracking-widest py-3 rounded-xl hover:bg-orange-600/40 transition">
+          Forza Pubblicazione Online
+        </button>
+      </div>
+
       <div className="card-bold space-y-4 border-red-900/30 bg-red-950/10">
         <h2 className="label-bold text-red-500">Danger Zone</h2>
         <button onClick={() => {
