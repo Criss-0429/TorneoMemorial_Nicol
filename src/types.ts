@@ -17,8 +17,9 @@ export interface Giocatore {
   id: string;
   squadra_id: string;
   nome: string;
+  cognome?: string;
   numero_maglia: number;
-  ruolo: 'P' | 'D' | 'C' | 'A';
+  ruolo?: 'P' | 'D' | 'C' | 'A';
   foto_url?: string;
 }
 
@@ -62,6 +63,7 @@ export interface AppState {
   squadre: Squadra[];
   partite: Partita[];
   capitani: Capitano[];
+  giocatori: Giocatore[];
   config: ConfigTorneo;
   loading: boolean;
 }

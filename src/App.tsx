@@ -41,6 +41,7 @@ export default function App() {
     squadre: [],
     partite: [],
     capitani: [],
+    giocatori: [],
     config: {
       id: 1,
       nome: 'Torneo Memorial',
@@ -81,6 +82,7 @@ export default function App() {
               squadre: cachedState.squadre,
               partite: cachedState.partite,
               capitani: cachedState.capitani,
+              giocatori: cachedState.giocatori || [],
               config: cachedState.config
             }).catch(console.error);
             return;
@@ -92,6 +94,7 @@ export default function App() {
               squadre: data.squadre || [],
               partite: data.partite || [],
               capitani: data.capitani || [],
+              giocatori: data.giocatori || [],
               config: data.config || prev.config,
               loading: false
             };
@@ -99,6 +102,7 @@ export default function App() {
               squadre: newState.squadre,
               partite: newState.partite,
               capitani: newState.capitani,
+              giocatori: newState.giocatori,
               config: newState.config
             }));
             
@@ -114,6 +118,7 @@ export default function App() {
             squadre: cachedState.squadre || [],
             partite: cachedState.partite || [],
             capitani: cachedState.capitani || [],
+            giocatori: cachedState.giocatori || [],
             config: cachedState.config
           }).catch(console.error);
         }
@@ -176,6 +181,7 @@ export default function App() {
         squadre: updated.squadre,
         partite: updated.partite,
         capitani: updated.capitani,
+        giocatori: updated.giocatori,
         config: updated.config
       }));
       
@@ -183,6 +189,7 @@ export default function App() {
         squadre: updated.squadre,
         partite: updated.partite,
         capitani: updated.capitani,
+        giocatori: updated.giocatori,
         config: updated.config
       }).catch(e => console.error("Errore salvataggio DB:", e));
 
@@ -566,11 +573,28 @@ function SquadreView({ state }: { state: IAppState }) {
       <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)] mb-6">Squadre Iscritte</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {state.squadre.map(s => (
-          <div key={s.id} className="card-bold flex items-center gap-4 py-4">
-            <div className="w-12 h-12 rounded-full border-2 border-[color:var(--color-tournament-border)]" style={{ backgroundColor: s.colore_maglia }}></div>
-            <div>
-              <h3 className="font-bold text-[color:var(--color-tournament-text)] text-lg">{s.nome}</h3>
-              <p className="text-xs text-[color:var(--color-tournament-text-muted)] font-mono">Girone {s.girone}</p>
+          <div key={s.id} className="card-bold flex flex-col gap-4 py-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full border-2 border-[color:var(--color-tournament-border)]" style={{ backgroundColor: s.colore_maglia }}></div>
+              <div>
+                <h3 className="font-bold text-[color:var(--color-tournament-text)] text-lg">{s.nome}</h3>
+                <p className="text-xs text-[color:var(--color-tournament-text-muted)] font-mono">Girone {s.girone}</p>
+              </div>
+            </div>
+            
+            <div className="mt-2 pt-2 border-t border-[color:var(--color-tournament-border)] w-full">
+              <span className="text-[10px] font-bold text-[color:var(--color-tournament-text-muted)] uppercase tracking-widest">Rosa:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(state.giocatori || []).filter(g => g.squadra_id === s.id).length === 0 ? (
+                  <span className="text-[10px] text-[color:var(--color-tournament-text-muted)] italic">Nessun giocatore</span>
+                ) : (
+                  (state.giocatori || []).filter(g => g.squadra_id === s.id).map(g => (
+                    <span key={g.id} className="text-[10px] bg-[color:var(--color-tournament-nav-bg)] border border-[color:var(--color-tournament-border)] px-1.5 py-0.5 rounded-md text-[color:var(--color-tournament-text)]">
+                      {g.numero_maglia > 0 ? `${g.numero_maglia}. ` : ''}{g.nome} {g.cognome || ''}{g.ruolo ? ` (${g.ruolo})` : ''}
+                    </span>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -874,6 +898,29 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
   const [dataFineRange, setDataFineRange] = useState('');
   const [giorniSettimana, setGiorniSettimana] = useState<number[]>([1,2,3,4,5]);
   const [nuovoOrarioTorneo, setNuovoOrarioTorneo] = useState('20:00');
+
+  const [selectedSquadraGiocatori, setSelectedSquadraGiocatori] = useState<string>('');
+  const [nuovoGiocatore, setNuovoGiocatore] = useState({ nome: '', cognome: '', numero_maglia: '', ruolo: '' });
+
+  const aggiungiGiocatore = () => {
+    if (!selectedSquadraGiocatori || !nuovoGiocatore.nome) return;
+    const g = {
+      id: `gio_${Date.now()}`,
+      squadra_id: selectedSquadraGiocatori,
+      nome: nuovoGiocatore.nome.trim(),
+      cognome: nuovoGiocatore.cognome.trim() || '',
+      numero_maglia: nuovoGiocatore.numero_maglia ? parseInt(nuovoGiocatore.numero_maglia) : 0,
+      ruolo: nuovoGiocatore.ruolo ? (nuovoGiocatore.ruolo as 'P' | 'D' | 'C' | 'A') : undefined
+    };
+    updateState({ giocatori: [...(state.giocatori || []), g] });
+    setNuovoGiocatore({ nome: '', cognome: '', numero_maglia: '', ruolo: '' });
+  };
+
+  const rimuoviGiocatore = (id: string) => {
+    if (confirm("Vuoi davvero eliminare questo giocatore?")) {
+      updateState({ giocatori: (state.giocatori || []).filter(g => g.id !== id) });
+    }
+  };
 
   const aggiungiDataTorneo = () => {
     if (!nuovaDataTorneo) return;
@@ -1301,6 +1348,134 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
       </div>
 
       <div className="card-bold space-y-4">
+        <h2 className="label-bold">Gestione Giocatori</h2>
+        <p className="text-xs text-[color:var(--color-tournament-text-muted)]">Aggiungi e gestisci i giocatori per ogni squadra.</p>
+        
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1 flex flex-col gap-1 w-full">
+            <label className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase font-bold">Squadra</label>
+            <select 
+              value={selectedSquadraGiocatori} 
+              onChange={e => setSelectedSquadraGiocatori(e.target.value)}
+              className="w-full bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none"
+            >
+              <option value="">Seleziona una squadra</option>
+              {state.squadre.map(s => (
+                <option key={s.id} value={s.id}>{s.nome}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {selectedSquadraGiocatori && (
+          <div className="space-y-4 border-t border-[color:var(--color-tournament-border)] pt-4">
+            <h3 className="text-sm font-bold text-[color:var(--color-tournament-primary)] uppercase">Aggiungi Giocatore</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input 
+                type="text" 
+                placeholder="Nome" 
+                value={nuovoGiocatore.nome}
+                onChange={e => setNuovoGiocatore({...nuovoGiocatore, nome: e.target.value})}
+                className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)] text-sm"
+              />
+              <input 
+                type="text" 
+                placeholder="Cognome (Opzionale)" 
+                value={nuovoGiocatore.cognome}
+                onChange={e => setNuovoGiocatore({...nuovoGiocatore, cognome: e.target.value})}
+                className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)] text-sm"
+              />
+              <input 
+                type="number" 
+                placeholder="N° Maglia" 
+                value={nuovoGiocatore.numero_maglia}
+                onChange={e => setNuovoGiocatore({...nuovoGiocatore, numero_maglia: e.target.value})}
+                className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)] text-sm"
+              />
+              <select 
+                value={nuovoGiocatore.ruolo || ''}
+                onChange={e => setNuovoGiocatore({...nuovoGiocatore, ruolo: e.target.value})}
+                className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-xl p-3 text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)] text-sm"
+              >
+                <option value="">Ruolo (Opzionale)</option>
+                <option value="P">Portiere (P)</option>
+                <option value="D">Difensore (D)</option>
+                <option value="C">Centrocampista (C)</option>
+                <option value="A">Attaccante (A)</option>
+              </select>
+            </div>
+            <button onClick={aggiungiGiocatore} className="w-full bg-[color:var(--color-tournament-primary)] text-black font-bold uppercase tracking-widest py-3 rounded-xl hover:brightness-90 transition text-xs">
+              Aggiungi Giocatore
+            </button>
+
+            <h3 className="text-sm font-bold text-[color:var(--color-tournament-text)] uppercase mt-6">Rosa Attuale</h3>
+            <div className="space-y-2">
+              {(state.giocatori || []).filter(g => g.squadra_id === selectedSquadraGiocatori).length === 0 ? (
+                <p className="text-xs text-[color:var(--color-tournament-text-muted)] italic">Nessun giocatore inserito.</p>
+              ) : (
+                (state.giocatori || []).filter(g => g.squadra_id === selectedSquadraGiocatori).map(g => (
+                  <div key={g.id} className="flex items-center gap-2 p-2 border border-[color:var(--color-tournament-border)] rounded-xl bg-black/30">
+                    <input 
+                      type="text" 
+                      value={g.nome} 
+                      onChange={e => {
+                        const updated = (state.giocatori || []).map(gio => gio.id === g.id ? { ...gio, nome: e.target.value } : gio);
+                        updateState({ giocatori: updated });
+                      }} 
+                      className="flex-1 font-bold text-[color:var(--color-tournament-text)] text-sm bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-[color:var(--color-tournament-primary)] focus:outline-none px-1" 
+                      title="Modifica nome" 
+                    />
+                    <input 
+                      type="text" 
+                      value={g.cognome} 
+                      onChange={e => {
+                        const updated = (state.giocatori || []).map(gio => gio.id === g.id ? { ...gio, cognome: e.target.value } : gio);
+                        updateState({ giocatori: updated });
+                      }} 
+                      className="flex-1 font-bold text-[color:var(--color-tournament-text)] text-sm bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-[color:var(--color-tournament-primary)] focus:outline-none px-1" 
+                      title="Modifica cognome" 
+                    />
+                    <select 
+                      value={g.ruolo || ''} 
+                      onChange={e => {
+                        const updated = (state.giocatori || []).map(gio => gio.id === g.id ? { ...gio, ruolo: (e.target.value || undefined) as 'P' | 'D' | 'C' | 'A' } : gio);
+                        updateState({ giocatori: updated });
+                      }} 
+                      className="bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-[color:var(--color-tournament-primary)] focus:outline-none text-xs font-bold text-[color:var(--color-tournament-text)] px-1"
+                      title="Modifica ruolo"
+                    >
+                      <option value="">-</option>
+                      <option value="P">P</option>
+                      <option value="D">D</option>
+                      <option value="C">C</option>
+                      <option value="A">A</option>
+                    </select>
+                    <input 
+                      type="number" 
+                      value={g.numero_maglia || ''} 
+                      onChange={e => {
+                        const updated = (state.giocatori || []).map(gio => gio.id === g.id ? { ...gio, numero_maglia: parseInt(e.target.value) || 0 } : gio);
+                        updateState({ giocatori: updated });
+                      }} 
+                      className="w-12 text-center font-bold text-[color:var(--color-tournament-primary)] text-sm bg-transparent border-b border-transparent hover:border-zinc-700 focus:border-[color:var(--color-tournament-primary)] focus:outline-none px-1" 
+                      title="Modifica numero" 
+                    />
+                    <button 
+                      onClick={() => rimuoviGiocatore(g.id)}
+                      className="text-red-500/70 hover:text-red-400 text-xs font-bold transition px-2"
+                      title="Elimina giocatore"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card-bold space-y-4">
         <h2 className="label-bold">Gestione Fasi / Calendario</h2>
         
         {state.config.fase_attuale !== 'playoff' && (
@@ -1523,6 +1698,58 @@ function MiaSquadraView({ state, updateState }: { state: IAppState, updateState:
          ) : (
            <p className="text-xs text-[color:var(--color-tournament-text-muted)] italic">Nessuna data segnalata.</p>
          )}
+      </div>
+
+      <div className="card-bold space-y-4">
+        <h2 className="label-bold">Rosa Squadra</h2>
+        <p className="text-xs text-[color:var(--color-tournament-text-muted)]">Visualizza i giocatori e modifica il numero di maglia.</p>
+        
+        <div className="space-y-2">
+          {(state.giocatori || []).filter(g => g.squadra_id === miaSquadra.id).length === 0 ? (
+            <p className="text-xs text-[color:var(--color-tournament-text-muted)] italic">Nessun giocatore inserito dall'amministratore.</p>
+          ) : (
+            (state.giocatori || []).filter(g => g.squadra_id === miaSquadra.id).map(g => (
+              <div key={g.id} className="flex items-center justify-between p-3 border border-[color:var(--color-tournament-border)] rounded-xl bg-black/30">
+                <div className="flex-1">
+                  <span className="font-bold text-[color:var(--color-tournament-text)]">{g.nome} {g.cognome || ''}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase font-bold">Ruolo</label>
+                    <select 
+                      value={g.ruolo || ''} 
+                      onChange={e => {
+                        const updated = (state.giocatori || []).map(gio => gio.id === g.id ? { ...gio, ruolo: (e.target.value || undefined) as 'P' | 'D' | 'C' | 'A' } : gio);
+                        updateState({ giocatori: updated });
+                      }} 
+                      className="bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-lg p-1 text-xs font-bold text-[color:var(--color-tournament-text)] focus:outline-none focus:border-[color:var(--color-tournament-primary)]"
+                    >
+                      <option value="">-</option>
+                      <option value="P">P</option>
+                      <option value="D">D</option>
+                      <option value="C">C</option>
+                      <option value="A">A</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase font-bold">N°</label>
+                    <input 
+                      type="number" 
+                      value={g.numero_maglia || ''} 
+                      onChange={e => {
+                        const updated = (state.giocatori || []).map(gio => gio.id === g.id ? { ...gio, numero_maglia: parseInt(e.target.value) || 0 } : gio);
+                        updateState({ giocatori: updated });
+                      }} 
+                      className="w-16 text-center font-bold text-[color:var(--color-tournament-primary)] text-sm bg-[color:var(--color-tournament-card)] border border-[color:var(--color-tournament-border)] rounded-lg p-1 focus:outline-none focus:border-[color:var(--color-tournament-primary)]" 
+                      title="Modifica numero maglia" 
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <div className="relative w-full aspect-[2/3] bg-gradient-to-b from-green-800 to-green-950 rounded-3xl border-4 border-white/10 overflow-hidden mt-6">
