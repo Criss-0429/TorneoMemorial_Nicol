@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { auth, db } from './lib/firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, getDocs, doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { AppState, Role, AppState as IAppState, Capitano, Squadra, Partita } from './types';
+import { AppState, Role, AppState as IAppState, Capitano, Squadra, Partita, Marcatore } from './types';
 import {
   LayoutDashboard,
   Users,
@@ -607,6 +607,8 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
   const [risultatoEditing, setRisultatoEditing] = useState<{p: Partita, idx: number} | null>(null);
   const [gCasa, setGCasa] = useState('');
   const [gTrasferta, setGTrasferta] = useState('');
+  const [marcatoriCasa, setMarcatoriCasa] = useState<Marcatore[]>([]);
+  const [marcatoriTrasferta, setMarcatoriTrasferta] = useState<Marcatore[]>([]);
 
   if (state.partite.length === 0) return <div className="card-bold text-center text-[color:var(--color-tournament-text-muted)]">Il calendario non è ancora stato generato.</div>;
   
@@ -703,12 +705,41 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
                 )}
               </div>
             </div>
+
+            {/* Visualizzazione Marcatori */}
+            {p.completata && (
+              <div className="mt-3 grid grid-cols-2 gap-4 border-t border-[color:var(--color-tournament-border)]/30 pt-3">
+                <div className="text-right space-y-0.5">
+                  {(p.marcatori_casa || []).map((m, i) => {
+                    const g = state.giocatori?.find(gio => gio.id === m.giocatore_id);
+                    return (
+                      <div key={i} className="text-[10px] text-[color:var(--color-tournament-text-muted)] font-medium">
+                        {g ? `${g.nome} ${g.cognome || ''}` : 'Anonimo'} {m.gol > 1 ? `(${m.gol})` : ''} ⚽
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-left space-y-0.5">
+                  {(p.marcatori_trasferta || []).map((m, i) => {
+                    const g = state.giocatori?.find(gio => gio.id === m.giocatore_id);
+                    return (
+                      <div key={i} className="text-[10px] text-[color:var(--color-tournament-text-muted)] font-medium">
+                        ⚽ {g ? `${g.nome} ${g.cognome || ''}` : 'Anonimo'} {m.gol > 1 ? `(${m.gol})` : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {state.ruolo === 'admin' && (
               <div className="mt-4 border-t border-[color:var(--color-tournament-border)] pt-4 text-center flex justify-center gap-2 print:hidden">
                  <button onClick={() => {
                    setRisultatoEditing({ p, idx });
                    setGCasa(p.gol_casa !== undefined ? p.gol_casa.toString() : '');
                    setGTrasferta(p.gol_trasferta !== undefined ? p.gol_trasferta.toString() : '');
+                   setMarcatoriCasa(p.marcatori_casa || []);
+                   setMarcatoriTrasferta(p.marcatori_trasferta || []);
                  }} className="block text-xs bg-[color:var(--color-tournament-primary)]/10 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold py-1 px-3 rounded-full transition-colors">
                    {p.completata ? 'MODIFICA RISULTATO' : 'INSERISCI RISULTATO'}
                  </button>
@@ -765,6 +796,76 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-8">
+               {/* Marcatori Casa */}
+               <div className="space-y-3">
+                 <h4 className="text-[10px] font-black uppercase text-[color:var(--color-tournament-text-muted)] tracking-widest text-center">Marcatori Casa</h4>
+                 <div className="space-y-2">
+                   {marcatoriCasa.map((m, i) => (
+                     <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg p-2 text-[10px]">
+                       <span className="truncate">{state.giocatori.find(g => g.id === m.giocatore_id)?.nome}</span>
+                       <div className="flex items-center gap-2">
+                         <span className="font-bold">x{m.gol}</span>
+                         <button onClick={() => setMarcatoriCasa(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500">✕</button>
+                       </div>
+                     </div>
+                   ))}
+                   <select 
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (!id) return;
+                      setMarcatoriCasa(prev => {
+                        const existing = prev.find(m => m.giocatore_id === id);
+                        if (existing) return prev.map(m => m.giocatore_id === id ? { ...m, gol: m.gol + 1 } : m);
+                        return [...prev, { giocatore_id: id, gol: 1 }];
+                      });
+                      e.target.value = '';
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-[10px] focus:outline-none"
+                   >
+                     <option value="">+ Aggiungi</option>
+                     {state.giocatori.filter(g => g.squadra_id === risultatoEditing.p.casa_id).map(g => (
+                       <option key={g.id} value={g.id}>{g.nome} {g.cognome}</option>
+                     ))}
+                   </select>
+                 </div>
+               </div>
+
+               {/* Marcatori Trasferta */}
+               <div className="space-y-3">
+                 <h4 className="text-[10px] font-black uppercase text-[color:var(--color-tournament-text-muted)] tracking-widest text-center">Marcatori Trasferta</h4>
+                 <div className="space-y-2">
+                   {marcatoriTrasferta.map((m, i) => (
+                     <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg p-2 text-[10px]">
+                       <span className="truncate">{state.giocatori.find(g => g.id === m.giocatore_id)?.nome}</span>
+                       <div className="flex items-center gap-2">
+                         <span className="font-bold">x{m.gol}</span>
+                         <button onClick={() => setMarcatoriTrasferta(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500">✕</button>
+                       </div>
+                     </div>
+                   ))}
+                   <select 
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (!id) return;
+                      setMarcatoriTrasferta(prev => {
+                        const existing = prev.find(m => m.giocatore_id === id);
+                        if (existing) return prev.map(m => m.giocatore_id === id ? { ...m, gol: m.gol + 1 } : m);
+                        return [...prev, { giocatore_id: id, gol: 1 }];
+                      });
+                      e.target.value = '';
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-[10px] focus:outline-none"
+                   >
+                     <option value="">+ Aggiungi</option>
+                     {state.giocatori.filter(g => g.squadra_id === risultatoEditing.p.trasferta_id).map(g => (
+                       <option key={g.id} value={g.id}>{g.nome} {g.cognome}</option>
+                     ))}
+                   </select>
+                 </div>
+               </div>
+            </div>
             
             <div className="flex gap-3">
               <button 
@@ -781,6 +882,8 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
                       ...risultatoEditing.p, 
                       gol_casa: parseInt(gCasa), 
                       gol_trasferta: parseInt(gTrasferta), 
+                      marcatori_casa: marcatoriCasa,
+                      marcatori_trasferta: marcatoriTrasferta,
                       completata: true 
                     };
                     updateState({ partite: updatedPartite });
@@ -824,43 +927,101 @@ function ClassificaView({ state }: { state: IAppState }) {
     return { girone, stats };
   });
 
+  // Calcolo classifica capocannonieri
+  const marcatoriMap: Record<string, number> = {};
+  state.partite.filter(p => p.completata).forEach(p => {
+    [...(p.marcatori_casa || []), ...(p.marcatori_trasferta || [])].forEach(m => {
+      marcatoriMap[m.giocatore_id] = (marcatoriMap[m.giocatore_id] || 0) + m.gol;
+    });
+  });
+
+  const classificaMarcatori = Object.entries(marcatoriMap)
+    .map(([id, gol]) => {
+      const g = state.giocatori?.find(gio => gio.id === id);
+      const s = state.squadre.find(sq => sq.id === g?.squadra_id);
+      return { 
+        id, 
+        nome: g ? `${g.nome} ${g.cognome || ''}` : 'Sconosciuto', 
+        squadra: s?.nome || 'N/A', 
+        gol 
+      };
+    })
+    .filter(m => m.gol > 0)
+    .sort((a, b) => b.gol - a.gol || a.nome.localeCompare(b.nome));
+
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)] border-b border-[color:var(--color-tournament-border)] pb-2">Classifiche Live</h2>
-      {classifiche.map(cl => (
-        <div key={cl.girone} className="card-bold overflow-hidden p-0">
-          <div className="bg-[color:var(--color-tournament-card)] px-4 py-3 border-b border-[color:var(--color-tournament-border)]">
-             <h3 className="font-bold text-[color:var(--color-tournament-primary)] text-sm uppercase tracking-widest">Girone {cl.girone}</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase tracking-widest bg-[color:var(--color-tournament-card)] border-b border-[color:var(--color-tournament-border)]">
-                <tr>
-                  <th className="px-4 py-3">Squadra</th>
-                  <th className="px-2 py-3 text-center">PT</th>
-                  <th className="px-2 py-3 text-center">G</th>
-                  <th className="px-2 py-3 text-center">DR</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cl.stats.map((s, idx) => (
-                  <tr key={s.id} className="border-b border-[color:var(--color-tournament-border)]/50 hover:bg-zinc-800/20">
-                    <td className="px-4 py-3 font-bold flex items-center gap-2">
-                       <span className="text-[color:var(--color-tournament-text-muted)] w-4">{idx + 1}.</span>
-                       <span className="text-[color:var(--color-tournament-text)] truncate">{s.nome}</span>
-                    </td>
-                    <td className="px-2 py-3 text-center font-black text-[color:var(--color-tournament-primary)]">{s.punti}</td>
-                    <td className="px-2 py-3 text-center text-[color:var(--color-tournament-text-muted)]">{s.pg}</td>
-                    <td className="px-2 py-3 text-center text-[color:var(--color-tournament-text-muted)]">{s.dr > 0 ? `+${s.dr}` : s.dr}</td>
+      <div>
+        <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)] border-b border-[color:var(--color-tournament-border)] pb-2 mb-6">Classifiche Live</h2>
+        <div className="space-y-8">
+          {classifiche.map(cl => (
+            <div key={cl.girone} className="card-bold overflow-hidden p-0">
+              <div className="bg-[color:var(--color-tournament-card)] px-4 py-3 border-b border-[color:var(--color-tournament-border)]">
+                 <h3 className="font-bold text-[color:var(--color-tournament-primary)] text-sm uppercase tracking-widest">Girone {cl.girone}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase tracking-widest bg-[color:var(--color-tournament-card)] border-b border-[color:var(--color-tournament-border)]">
+                    <tr>
+                      <th className="px-4 py-3">Squadra</th>
+                      <th className="px-2 py-3 text-center">PT</th>
+                      <th className="px-2 py-3 text-center">G</th>
+                      <th className="px-2 py-3 text-center">DR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cl.stats.map((s, idx) => (
+                      <tr key={s.id} className="border-b border-[color:var(--color-tournament-border)]/50 hover:bg-zinc-800/20">
+                        <td className="px-4 py-3 font-bold flex items-center gap-2">
+                           <span className="text-[color:var(--color-tournament-text-muted)] w-4">{idx + 1}.</span>
+                           <span className="text-[color:var(--color-tournament-text)] truncate">{s.nome}</span>
+                        </td>
+                        <td className="px-2 py-3 text-center font-black text-[color:var(--color-tournament-primary)]">{s.punti}</td>
+                        <td className="px-2 py-3 text-center text-[color:var(--color-tournament-text-muted)]">{s.pg}</td>
+                        <td className="px-2 py-3 text-center text-[color:var(--color-tournament-text-muted)]">{s.dr > 0 ? `+${s.dr}` : s.dr}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {classificaMarcatori.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-black uppercase text-[color:var(--color-tournament-text)] border-b border-[color:var(--color-tournament-border)] pb-2 mb-6">Capocannoniere</h2>
+          <div className="card-bold overflow-hidden p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-[10px] text-[color:var(--color-tournament-text-muted)] uppercase tracking-widest bg-[color:var(--color-tournament-card)] border-b border-[color:var(--color-tournament-border)]">
+                  <tr>
+                    <th className="px-4 py-3">Giocatore</th>
+                    <th className="px-4 py-3">Squadra</th>
+                    <th className="px-4 py-3 text-center">Goal</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {classificaMarcatori.map((m, idx) => (
+                    <tr key={m.id} className="border-b border-[color:var(--color-tournament-border)]/50 hover:bg-zinc-800/20">
+                      <td className="px-4 py-3 font-bold flex items-center gap-2">
+                         <span className="text-[color:var(--color-tournament-text-muted)] w-4">{idx + 1}.</span>
+                         <span className="text-[color:var(--color-tournament-text)]">{m.nome}</span>
+                         {idx === 0 && <Trophy size={14} className="text-yellow-500" />}
+                      </td>
+                      <td className="px-4 py-3 text-[color:var(--color-tournament-text-muted)]">{m.squadra}</td>
+                      <td className="px-4 py-3 text-center font-black text-[color:var(--color-tournament-primary)] text-lg">{m.gol}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      ))}
+      )}
     </div>
-  ); 
+  );
 }
 
 function AdminView({ state, updateState, setActiveTab }: { state: IAppState, updateState: (s: Partial<IAppState>) => void, setActiveTab: (t:string)=>void }) { 

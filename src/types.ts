@@ -13,6 +13,11 @@ export interface Squadra {
   giorni_indisponibili?: string[]; // Date in formato YYYY-MM-DD in cui la squadra non può giocare
 }
 
+export interface Marcatore {
+  giocatore_id: string;
+  gol: number;
+}
+
 export interface Giocatore {
   id: string;
   squadra_id: string;
@@ -33,6 +38,8 @@ export interface Partita {
   fase: 'andata' | 'ritorno' | 'fase a gironi' | 'girone' | 'spareggio' | 'semifinale' | 'finale' | 'quarti';
   gol_casa?: number;
   gol_trasferta?: number;
+  marcatori_casa?: Marcatore[];
+  marcatori_trasferta?: Marcatore[];
   completata: boolean;
 }
 
