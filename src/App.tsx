@@ -31,6 +31,30 @@ import { useTheme } from './hooks/useTheme';
 // --- CONFIGURAZIONE ---
 const ADMIN_EMAILS = ['cristian.laporta04@gmail.com', 'Cinziavenuti1985@libero.it']; 
 
+// Helper per calcolare le classifiche
+const calcolaClassifiche = (state: IAppState) => {
+  return [1, 2].map(girone => {
+    const squadreGirone = state.squadre.filter(s => s.girone === girone);
+    const stats = squadreGirone.map(s => {
+      let punti = 0, gf = 0, gs = 0, pg = 0;
+      state.partite.filter(p => p.completata && p.girone === girone && (p.casa_id === s.id || p.trasferta_id === s.id)).forEach(p => {
+        pg++;
+        if (p.casa_id === s.id) {
+          gf += p.gol_casa!; gs += p.gol_trasferta!;
+          if (p.gol_casa! > p.gol_trasferta!) punti += 3;
+          else if (p.gol_casa === p.gol_trasferta) punti += 1;
+        } else {
+          gf += p.gol_trasferta!; gs += p.gol_casa!;
+          if (p.gol_trasferta! > p.gol_casa!) punti += 3;
+          else if (p.gol_casa === p.gol_trasferta) punti += 1;
+        }
+      });
+      return { ...s, punti, gf, gs, pg, dr: gf - gs };
+    }).sort((a, b) => b.punti - a.punti || b.dr - a.dr || b.gf - a.gf);
+    return { girone, stats };
+  });
+};
+
 export default function App() {
   const { isDark, toggleTheme } = useTheme();
   const { toasts, dismissToast, success, error, info, ToastContainer } = useToast();
@@ -905,27 +929,8 @@ function CalendarioView({ state, updateState }: { state: IAppState, updateState:
 function ClassificaView({ state }: { state: IAppState }) { 
   if (state.squadre.length === 0) return <div className="card-bold text-center text-[color:var(--color-tournament-text-muted)]">Ancora nessuna classifica.</div>;
   
-  // Calcolo classifiche in base alle partite completate
-  const classifiche = [1, 2].map(girone => {
-    const squadreGirone = state.squadre.filter(s => s.girone === girone);
-    const stats = squadreGirone.map(s => {
-      let punti = 0, gf = 0, gs = 0, pg = 0;
-      state.partite.filter(p => p.completata && p.girone === girone && (p.casa_id === s.id || p.trasferta_id === s.id)).forEach(p => {
-        pg++;
-        if (p.casa_id === s.id) {
-          gf += p.gol_casa!; gs += p.gol_trasferta!;
-          if (p.gol_casa! > p.gol_trasferta!) punti += 3;
-          else if (p.gol_casa === p.gol_trasferta) punti += 1;
-        } else {
-          gf += p.gol_trasferta!; gs += p.gol_casa!;
-          if (p.gol_trasferta! > p.gol_casa!) punti += 3;
-          else if (p.gol_casa === p.gol_trasferta) punti += 1;
-        }
-      });
-      return { ...s, punti, gf, gs, pg, dr: gf - gs };
-    }).sort((a, b) => b.punti - a.punti || b.dr - a.dr || b.gf - a.gf);
-    return { girone, stats };
-  });
+  // Calcolo classifiche usando l'helper
+  const classifiche = calcolaClassifiche(state);
 
   // Calcolo classifica capocannonieri
   const marcatoriMap: Record<string, number> = {};
@@ -1243,41 +1248,62 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
     });
   };
 
-  const generaPlayoffMock = () => {
-    // Raccoglie la classifica per prendere le prime due di ogni girone
-    const classifiche = [1, 2].map(girone => {
-      const squadreGirone = state.squadre.filter(s => s.girone === girone);
-      const stats = squadreGirone.map(s => {
-        let punti = 0, gf = 0, gs = 0;
-        state.partite.filter(p => p.completata && p.girone === girone && (p.casa_id === s.id || p.trasferta_id === s.id)).forEach(p => {
-          if (p.casa_id === s.id) {
-            gf += p.gol_casa!; gs += p.gol_trasferta!;
-            if (p.gol_casa! > p.gol_trasferta!) punti += 3;
-            else if (p.gol_casa === p.gol_trasferta) punti += 1;
-          } else {
-            gf += p.gol_trasferta!; gs += p.gol_casa!;
-            if (p.gol_trasferta! > p.gol_casa!) punti += 3;
-            else if (p.gol_casa === p.gol_trasferta) punti += 1;
-          }
-        });
-        return { ...s, punti, dr: gf - gs };
-      }).sort((a, b) => b.punti - a.punti || b.dr - a.dr);
-      return stats;
-    });
+  const generaQuartiMock = () => {
+    const classifiche = calcolaClassifiche(state);
+    const primeG1 = classifiche[0].stats.slice(0, 3);
+    const primeG2 = classifiche[1].stats.slice(0, 3);
 
-    const primeG1 = classifiche[0].slice(0, 2);
-    const primeG2 = classifiche[1].slice(0, 2);
-
-    if (primeG1.length < 2 || primeG2.length < 2) {
-      return alert("Servono almeno 2 squadre per girone per generare le semifinali.");
+    if (primeG1.length < 3 || primeG2.length < 3) {
+      return alert("Servono almeno 3 squadre per girone per generare i quarti di finale.");
     }
 
     const nuovePartite: Partita[] = [
       {
+        id: `p_quarti_1_${Date.now()}`,
+        casa_id: primeG1[1].id, // 2ª Girone A
+        trasferta_id: primeG2[2].id, // 3ª Girone B
+        data: new Date().toISOString().split('T')[0],
+        orario: "20:00",
+        girone: undefined,
+        fase: 'quarti',
+        completata: false
+      },
+      {
+        id: `p_quarti_2_${Date.now()}`,
+        casa_id: primeG2[1].id, // 2ª Girone B
+        trasferta_id: primeG1[2].id, // 3ª Girone A
+        data: new Date().toISOString().split('T')[0],
+        orario: "21:00",
+        girone: undefined,
+        fase: 'quarti',
+        completata: false
+      }
+    ];
+
+    updateState({ 
+      partite: [...state.partite, ...nuovePartite],
+      config: { ...state.config, fase_attuale: 'playoff' }
+    });
+  };
+
+  const generaSemifinaliMock = () => {
+    const quarti = state.partite.filter(p => p.fase === 'quarti');
+    if (quarti.length !== 2) return alert("Devono esserci esattamente 2 quarti di finale.");
+    if (!quarti.every(p => p.completata)) return alert("Completa prima i risultati di tutti i quarti.");
+
+    const classifiche = calcolaClassifiche(state);
+    const vincitriceQ1 = quarti[0].gol_casa! > quarti[0].gol_trasferta! ? quarti[0].casa_id : quarti[0].trasferta_id;
+    const vincitriceQ2 = quarti[1].gol_casa! > quarti[1].gol_trasferta! ? quarti[1].casa_id : quarti[1].trasferta_id;
+
+    const primaG1 = classifiche[0].stats[0];
+    const primaG2 = classifiche[1].stats[0];
+
+    const nuovePartite: Partita[] = [
+      {
         id: `p_semi_1_${Date.now()}`,
-        casa_id: primeG1[0].id,
-        trasferta_id: primeG2[1].id,
-        data: new Date().toISOString(),
+        casa_id: primaG1.id, // 1ª Girone A
+        trasferta_id: vincitriceQ2, // Vincitrice 2ªB vs 3ªA
+        data: new Date().toISOString().split('T')[0],
         orario: "20:00",
         girone: undefined,
         fase: 'semifinale',
@@ -1285,9 +1311,9 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
       },
       {
         id: `p_semi_2_${Date.now()}`,
-        casa_id: primeG2[0].id,
-        trasferta_id: primeG1[1].id,
-        data: new Date().toISOString(),
+        casa_id: primaG2.id, // 1ª Girone B
+        trasferta_id: vincitriceQ1, // Vincitrice 2ªA vs 3ªB
+        data: new Date().toISOString().split('T')[0],
         orario: "21:00",
         girone: undefined,
         fase: 'semifinale',
@@ -1296,8 +1322,7 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
     ];
 
     updateState({ 
-      partite: [...state.partite, ...nuovePartite],
-      config: { ...state.config, fase_attuale: 'playoff' }
+      partite: [...state.partite, ...nuovePartite]
     });
   };
 
@@ -1695,21 +1720,35 @@ function AdminView({ state, updateState, setActiveTab }: { state: IAppState, upd
 
         {state.config.fase_attuale === 'setup' || state.config.fase_attuale === 'gironi' ? (
           <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)] mt-4">
-            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Playoff (Semifinali)</h3>
-            <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Chiude la fase a gironi e genera le semifinali con le prime 2 dei gironi.</p>
-            <button onClick={generaPlayoffMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
-              Genera Semifinali
+            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Playoff (Quarti)</h3>
+            <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Chiude la fase a gironi e genera i quarti (2ªA vs 3ªB e 2ªB vs 3ªA). Le prime vanno in semi.</p>
+            <button onClick={generaQuartiMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
+              Genera Quarti di Finale
             </button>
           </div>
         ) : null}
 
         {state.config.fase_attuale === 'playoff' ? (
-          <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)] mt-4">
-            <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Finale</h3>
-            <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera la finale con le vincitrici delle semifinali.</p>
-            <button onClick={generaFinaleMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
-              Genera Finale
-            </button>
+          <div className="space-y-4 mt-4">
+            {state.partite.filter(p => p.fase === 'quarti').length > 0 && (
+              <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)]">
+                <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Semifinali</h3>
+                <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera le semifinali con le 1ª dei gironi e le vincitrici dei quarti.</p>
+                <button onClick={generaSemifinaliMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
+                  Genera Semifinali
+                </button>
+              </div>
+            )}
+            
+            {state.partite.filter(p => p.fase === 'semifinale').length > 0 && (
+              <div className="p-4 border border-[color:var(--color-tournament-border)] rounded-xl bg-[color:var(--color-tournament-card)]">
+                <h3 className="text-[color:var(--color-tournament-primary)] font-bold mb-2">Avanza Fase: Finale</h3>
+                <p className="text-xs text-[color:var(--color-tournament-text-muted)] mb-4">Genera la finale con le vincitrici delle semifinali.</p>
+                <button onClick={generaFinaleMock} className="w-full bg-[color:var(--color-tournament-primary)]/20 text-[color:var(--color-tournament-primary)] hover:bg-[color:var(--color-tournament-primary)] hover:text-black font-bold uppercase tracking-widest py-3 rounded-xl transition border border-[color:var(--color-tournament-primary)]/50">
+                  Genera Finale
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
       </div>
